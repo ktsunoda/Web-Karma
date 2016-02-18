@@ -4,16 +4,7 @@ function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutof
 	var columnTitle = wsColumnTitle;
 	var columnId = wsColumnId;
 
-	var options = [{
-			name: "Set Semantic Type",
-			func: setSemanticType,
-			leafOnly: true,
-			leafExcluded: false
-		}, {
-			name: "divider",
-			leafOnly: true,
-			leafExcluded: false
-		}, {
+	var options = [ {
 			name: "Add Column",
 			func: addColumn,
 			leafOnly: false,
@@ -34,101 +25,12 @@ function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutof
 			leafOnly: false,
 			leafExcluded: false
 		}, {
-			name: "divider",
-			leafOnly: false,
-			leafExcluded: false
-		},
-
-		{
-			name: "Extract Entities",
-			func: extractEntities,
-			leafOnly: true,
-			leafExcluded: false
-		}, {
-			name: "PyTransform",
-			func: pyTransform,
-			leafOnly: true,
-			leafExcluded: false
-		}, 
-		{
 			name: "Transform",
 			func: transform,
 			leafOnly: true,
 			leafExcluded: false
 		},
-		//{name:"Generate Cluster Values", func:clusterValues, leafOnly:true, leafExcluded: false},
-		//{name:"Merge Cluster Values", func:mergeValues, leafOnly:true, leafExcluded: false},
-		{
-			name: "divider",
-			leafOnly: true,
-			leafExcluded: false
-		},
-
-		{
-			name: "Invoke Service",
-			func: invokeService,
-			leafOnly: true,
-			leafExcluded: false
-		},
-		//{name:"Show Chart", func:showChart, leafOnly:true, leafExcluded: false},
-		{
-			name: "divider",
-			leafOnly: true,
-			leafExcluded: false
-		},
-
-		{
-			name: "Group By",
-			func: GroupBy,
-			leafOnly: false,
-			leafExcluded: true
-		}, {
-			name: "Unfold",
-			func: Unfold,
-			leafOnly: true,
-			leafExcluded: false
-		}, {
-			name: "Fold",
-			func: Fold,
-			leafOnly: false,
-			leafExcluded: true
-		}, {
-			name: "Glue Columns",
-			func: Glue,
-			leafOnly: false,
-			leafExcluded: true
-		}, {
-			name: "Selection",
-			func: undefined,
-			addLevel: true,
-			leafOnly: false,
-			leafExcluded: true,
-			levels: [{
-				name: "Add Rows",
-				func: addRows
-			}, {
-				name: "Intersect Rows",
-				func: intersectRows
-			}, {
-				name: "Subtract Rows",
-				func: subtractRows
-			}, {
-				name: "Invert",
-				func: invertRows
-			}, {
-				name: "Clear",
-				func: undefined,
-				addLevel: true,
-				levels: [{
-					name: "In All Nested Tables",
-					func: clearAll
-				}, {
-					name: "In This Column",
-					func: clearThis
-				}]
-			}]
-		}
-	];
+		];
 
 	function hideDropdown() {
 		$('.dropdown.open .dropdown-toggle').dropdown('toggle');

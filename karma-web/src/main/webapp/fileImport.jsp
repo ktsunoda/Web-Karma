@@ -53,27 +53,12 @@
 					    Excel Spreadsheet
 					  </label>
 					</div>
-					<div class="radio">
+					<!-- <div class="radio">
 					  <label>
 					    <input type="radio" name="FileFormatSelection" id="OWLFileFormat" value="Ontology">
 					    OWL Ontology
 					  </label>
-					</div>
-					<div>
-						<hr />
-					</div>
-					<div class="checkbox">
-					  <label>
-					    <input type="checkbox" name="RevisionCheck">
-					    Revision of worksheet <select id="revisedWorksheetSelector"></select>
-					  </label>
-					</div>
-					<div class="checkbox">
-					  <label>
-					    <input type="checkbox" name="FilterCheck">
-					    Filter Columns
-					  </label>
-					</div>
+					</div> -->
 					<div class="error" style="display: none" id="fileFormatError">Please select the file format!</div>
 			  </div>
 			  <div class="modal-footer">

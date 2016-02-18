@@ -269,7 +269,7 @@ function parse(data) {
 							)
 					);
 					mainDiv.append(titleDiv);
-					mainDiv.append(headerDiv);
+					// mainDiv.append(headerDiv);
 					// Add the table (if it does not exists)
 					var tableDiv = $("<div>").attr("id", worksheet["worksheetId"] + "TableDiv").addClass("TableDiv").mouseleave(function() {
 						$("div#tableCellMenuButtonDiv").hide();

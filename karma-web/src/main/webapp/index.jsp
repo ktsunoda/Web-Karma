@@ -159,25 +159,17 @@ and related projects, please see: http://www.isi.edu/integration
 		            <span class="icon-bar"></span>
 		            <span class="icon-bar"></span>
 		          </button>
-		          <a class="navbar-brand" href="#">Karma 
-		              	<span id="karma-version"><jsp:include page="version.jsp" /></a>
+		          <a class="navbar-brand" href="#">SmartEditor</a>
 		        </div>
 		        <div class="navbar-collapse collapse">
 		          <ul class="nav navbar-nav col-sm-5">
 		            <li class="dropdown">
 		              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Import <b class="caret"></b></a>
-		              <ul class="dropdown-menu multi-level">
-		                  <li><a href="#" id="importDatabaseTableButton">Database Table</a></li>
-		                  <li><a href="#" id="importSQLButton">Using SQL</a></li>
-		                  <li><a href="#" id="importFromServiceButton" >From Service</a></li>
+		              <ul class="dropdown-menu multi-level">		            
 		                  <li><a href="#" class="fileinput-button"><form id="fileupload" action="ImportFileCommand" method="POST" enctype="multipart/form-data">From File<input type="file" name="files[]" multiple></form></a></li>
 		              </ul>
 		            </li>
-		            
-		            <li><a href="#" id="modelManagerButton" data-html='true' data-toggle='tooltip' data-placement='bottom'>Manage Models</a></li>
-
-					<li><a href="#" id="resetButton" data-html='true' title='Delete all saved files,<br/>use with care!' data-toggle='tooltip' data-placement='bottom'>Reset ...</a></li>
-					
+		            			
 		            <li>
 		            		<div class="span5 fileupload-progress fade">
 								<!-- The global progress bar -->
@@ -196,11 +188,9 @@ and related projects, please see: http://www.isi.edu/integration
 		          <ul class="nav navbar-nav navbar-middle col-sm-2">
 		            <li id="manualModeHeader" style="display:none;"><a href="#" style="cursor: none">Manual Mode</a></li>
 		          </ul>
-		          
 		          <ul class="nav navbar-nav navbar-right">
-		            <li><a target="_blank" href="https://github.com/InformationIntegrationGroup/Web-Karma/wiki" title='View user guide in GitHub' data-toggle='tooltip' data-placement='bottom'>User Guide</a></li>
-			        <li><a target="_blank" href="http://isi.edu/integration/karma" title='Open the Karma home page in a new window' data-toggle='tooltip' data-placement='bottom'>Karma Home</a></li>
-			        <li><a target="_blank" href="" id="sparql_end_point_link" title='Open RDF workbench in a new window' data-toggle='tooltip' data-placement='bottom'>OpenRDF</a></li>
+		          <li>Yelp Hackathon-19</li>
+		          <li></li>
 		          </ul>
 		        </div>
 		      </div> <!--  end of navbar -->
@@ -254,20 +244,20 @@ and related projects, please see: http://www.isi.edu/integration
 	        	<div class="row">
 	        		<div class="col-sm-4">
 	        			<div class="form-group">
-	        				<label>Karma Home: </label>
-	        				<span id="karmaHome"><%=ServletContextParameterMap.getParameterValue(ContextParameter.USER_DIRECTORY_PATH) %></span>
+	        				<!--<label>Karma Home: </label> -->
+	        				<!--<span id="karmaHome"><%=ServletContextParameterMap.getParameterValue(ContextParameter.USER_DIRECTORY_PATH) %></span> -->
 	        			</div>
 	        		</div>
 	        		<div class="col-sm-4">
 	        			<div class="form-group">
-							<label for="txtModel_URL">Model Endpoint: </label>
-							<span class="edit" id="txtModel_URL"></span>
+							<!-- <label for="txtModel_URL">Model Endpoint: </label> -->
+							<!-- <span class="edit" id="txtModel_URL"></span> -->
 						</div>
 	        		</div>
 	        		<div class="col-sm-4">
 	        			<div class="form-group">
-							<label for="txtData_URL">Data Endpoint: </label>
-							<span class="edit" id="txtData_URL"></span>
+							<!-- <label for="txtData_URL">Data Endpoint: </label> -->
+							<!-- <span class="edit" id="txtData_URL"></span> -->
 						</div>
 	        		</div>
 	        	</div>
