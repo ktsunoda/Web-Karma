@@ -69,10 +69,10 @@ public class AddColumnCommand extends WorksheetSelectionCommand {
 	private static Logger logger = LoggerFactory
 	.getLogger(AddColumnCommand.class);
 
-	protected AddColumnCommand(String id,String worksheetId,
+	protected AddColumnCommand(String id, String model, String worksheetId,
 			String hTableId, String hNodeId, String newColumnName, 
 			String defaultValue, String selectionId) {
-		super(id, worksheetId, selectionId);
+		super(id, model, worksheetId, selectionId);
 		this.hNodeId = hNodeId;
 		this.hTableId = hTableId;
 		this.newColumnName=newColumnName;
@@ -151,8 +151,9 @@ public class AddColumnCommand extends WorksheetSelectionCommand {
 			//create container and return hNodeId of newly created column
 			UpdateContainer c =  new UpdateContainer(new AddColumnUpdate(newHNodeId, worksheetId));
 			
-			c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet)));
-			c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace, ndid.getHNodePath(workspace.getFactory())));
+			c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet), workspace.getContextId()));
+			c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
+			
 			return c;
 		} catch (Exception e) {
 			logger.error("Error in AddColumnCommand" + e.toString());
@@ -185,7 +186,7 @@ public class AddColumnCommand extends WorksheetSelectionCommand {
 		//remove the new column
 		currentTable.removeHNode(newHNodeId, worksheet);
 
-		return WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet));
+		return WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet), workspace.getContextId());
 	}
 
 

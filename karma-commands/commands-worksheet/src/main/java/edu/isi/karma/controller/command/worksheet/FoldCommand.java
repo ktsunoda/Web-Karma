@@ -49,9 +49,9 @@ public class FoldCommand extends WorksheetSelectionCommand {
 		updateType, hNodeId, worksheetId
 	}
 
-	protected FoldCommand(String id,String worksheetId, 
+	protected FoldCommand(String id, String model, String worksheetId, 
 			String hTableId, String hNodeId, String selectionId) {
-		super(id, worksheetId, selectionId);
+		super(id, model, worksheetId, selectionId);
 		this.hNodeId = hNodeId;
 		this.hTableId = hTableId;
 		
@@ -169,12 +169,12 @@ public class FoldCommand extends WorksheetSelectionCommand {
 		try{
 			AddValuesCommandFactory factory = new AddValuesCommandFactory();
 			//hNodeId = hnodes.get(0).getId();
-			cmd = factory.createCommand(input, workspace, hNodeId, worksheetId, hTableId, worksheet.getHeaders().getNewColumnName("fold"), HNodeType.Transformation, selection.getName());
+			cmd = factory.createCommand(input, model, workspace, hNodeId, worksheetId, hTableId, worksheet.getHeaders().getNewColumnName("fold"), HNodeType.Transformation, selection.getName());
 			cmd.doIt(workspace);
 			outputColumns.addAll(cmd.getOutputColumns());
 			WorksheetUpdateFactory.detectSelectionStatusChange(worksheetId, workspace, this);
 			UpdateContainer c =  new UpdateContainer();		
-			c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet)));
+			c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet), workspace.getContextId()));
 			c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
 			return c;
 		} catch (Exception e) {
@@ -190,7 +190,7 @@ public class FoldCommand extends WorksheetSelectionCommand {
 		//remove the new column
 		//currentTable.removeHNode(newHNodeId, worksheet);
 		UpdateContainer c =  new UpdateContainer();		
-		c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(workspace)));
+		c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(workspace), workspace.getContextId()));
 		c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
 		return c;
 	}

@@ -21,11 +21,22 @@
 
 package edu.isi.karma.controller.command.transformation;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import edu.isi.karma.controller.command.CommandException;
+import edu.isi.karma.controller.command.worksheet.AddValuesCommand;
+import edu.isi.karma.controller.command.worksheet.AddValuesCommandFactory;
 import edu.isi.karma.controller.command.worksheet.MultipleValueEditColumnCommand;
 import edu.isi.karma.controller.command.worksheet.MultipleValueEditColumnCommandFactory;
 import edu.isi.karma.controller.history.HistoryJsonUtil.ParameterType;
@@ -34,11 +45,16 @@ import edu.isi.karma.controller.update.InfoUpdate;
 import edu.isi.karma.controller.update.UpdateContainer;
 import edu.isi.karma.controller.update.WorksheetUpdateFactory;
 import edu.isi.karma.rep.HNode;
+import edu.isi.karma.rep.HNode.HNodeType;
+import edu.isi.karma.rep.HNodePath;
+import edu.isi.karma.rep.Node;
+import edu.isi.karma.rep.Node.NodeStatus;
 import edu.isi.karma.rep.RepFactory;
 import edu.isi.karma.rep.Worksheet;
 import edu.isi.karma.rep.Workspace;
 import edu.isi.karma.util.CommandInputJSONUtil;
 import edu.isi.karma.webserver.ExecutionController;
+import edu.isi.karma.webserver.KarmaException;
 
 public abstract class MutatingPythonTransformationCommand extends
 		PythonTransformationCommand {
@@ -46,13 +62,15 @@ public abstract class MutatingPythonTransformationCommand extends
 	private static Logger logger = LoggerFactory.getLogger(MutatingPythonTransformationCommand.class);
 	
 	protected final String newColumnName;
-	
-	public MutatingPythonTransformationCommand(String id, String newColumnName,
+	protected List<Node> affectedNodes = new LinkedList<Node>();
+	protected boolean isJSONOutput = false;
+	public MutatingPythonTransformationCommand(String id, String model, String newColumnName,
 			String transformationCode, String worksheetId, String hNodeId,
-			String errorDefaultValue, String selectionId) {
-		super(id, transformationCode, worksheetId, hNodeId,
+			String errorDefaultValue, String selectionId, boolean isJSONOutput) {
+		super(id, model, transformationCode, worksheetId, hNodeId,
 				errorDefaultValue, selectionId);
 		this.newColumnName = newColumnName;
+		this.isJSONOutput = isJSONOutput;
 	}
 
 	@Override
@@ -76,7 +94,7 @@ public abstract class MutatingPythonTransformationCommand extends
 			JSONArray multiCellEditInput = getMultiCellValueEditInputJSON(transformedRows, newHNodeId);
 			MultipleValueEditColumnCommandFactory mfc = (MultipleValueEditColumnCommandFactory)
 					ctrl.getCommandFactoryMap().get(MultipleValueEditColumnCommand.class.getSimpleName());
-			MultipleValueEditColumnCommand mvecc = (MultipleValueEditColumnCommand) mfc.createCommand(multiCellEditInput, workspace);
+			MultipleValueEditColumnCommand mvecc = (MultipleValueEditColumnCommand) mfc.createCommand(multiCellEditInput, model, workspace);
 			mvecc.doIt(workspace);
 			
 		} catch (Exception e) {
@@ -89,10 +107,10 @@ public abstract class MutatingPythonTransformationCommand extends
 		worksheet.getMetadataContainer().getColumnMetadata().addColumnDerivedFrom(newHNodeId, hNodeId);
 		// Prepare the output container
 		UpdateContainer c = new UpdateContainer();
-		c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet)));
+		c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet), workspace.getContextId()));
 		
 		/** Add the alignment update **/
-		c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace, workspace.getFactory().getHNode(newHNodeId).getHNodePath(workspace.getFactory())));
+		c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
 		
 		c.add(new InfoUpdate("Transformation complete"));
 		return c;
@@ -107,5 +125,50 @@ public abstract class MutatingPythonTransformationCommand extends
 		arr.put(CommandInputJSONUtil.createJsonObject(MultipleValueEditColumnCommandFactory.Arguments.rows.name(), 
 				rowsArray, ParameterType.other));
 		return arr;
+	}
+	
+	protected Map<String, String> gatherTransformedResults(Workspace workspace, String hNodeId) {
+		Map<String, String> rowToValueMapping = new HashMap<String, String>();
+		HNodePath hNodePath = workspace.getFactory().getHNode(hNodeId).getHNodePath(workspace.getFactory());
+		List<Node> nodes = new ArrayList<Node>();
+		workspace.getWorksheet(worksheetId).getDataTable().collectNodes(hNodePath, nodes, getSuperSelection(workspace));
+		for (Node node : nodes) {
+			rowToValueMapping.put(node.getBelongsToRow().getId(), node.getValue().asString());
+			node.clearValue(NodeStatus.original);
+			affectedNodes.add(node);
+		}
+		return rowToValueMapping;
+	}
+	
+	protected void handleJSONOutput(Workspace workspace, Map<String, String> mapping, HNode newNode) throws JSONException, KarmaException, CommandException {
+		String name = newNode.getColumnName();
+		AddValuesCommandFactory addFactory = new AddValuesCommandFactory();
+		for (Entry<String, String> entry : mapping.entrySet()) {
+			JSONArray array = new JSONArray();
+			JSONObject obj2 = new JSONObject();
+			Object obj = entry.getValue();
+			try {
+				obj = new JSONObject(entry.getValue());
+			}
+			catch(Exception e) 
+			{}
+			try {
+				obj = new JSONArray(entry.getValue());
+			}
+			catch(Exception e) 
+			{}
+			obj2.put("rowId", entry.getKey());
+			obj2.put("rowIdHash", "");
+			obj2.put("values", obj);
+			array.put(obj2);
+			JSONArray input = new JSONArray();
+			JSONObject obj3 = new JSONObject();
+			obj3.put("name", "AddValues");
+			obj3.put("value", array.toString());
+			obj3.put("type", "other");
+			input.put(obj3);
+			AddValuesCommand command = (AddValuesCommand) addFactory.createCommand(input, model, workspace, hNodeId, worksheetId, newNode.getHTableId(), name, HNodeType.Transformation, getSuperSelection(workspace).getName());
+			command.doIt(workspace);
+		}
 	}
 }

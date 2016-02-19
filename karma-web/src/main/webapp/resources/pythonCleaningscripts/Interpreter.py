@@ -15,12 +15,10 @@ class Interpreter(InterpreterType):
     def __init__(self, script):
 	script = script.encode("utf-8","ignore")
 	script = script.decode("utf-8")
-	sys.setdefaultencoding("utf-8")
         trans = Translator(script)
+	reload(sys)
+	sys.setdefaultencoding('utf8')
         self.script=trans.translate(script) 
-    def func(self,name,paramlist):
-        if name == "h":
-            print "hello world"
     def execute(self,value):
         value = value.encode("utf-8","ignore")
 	value = value.decode("utf-8")

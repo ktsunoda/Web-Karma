@@ -35,9 +35,7 @@ import edu.isi.karma.controller.command.CommandType;
 import edu.isi.karma.controller.command.WorksheetCommand;
 import edu.isi.karma.controller.history.HistoryJsonUtil.ClientJsonKeys;
 import edu.isi.karma.controller.history.HistoryJsonUtil.ParameterType;
-import edu.isi.karma.controller.update.AlignmentSVGVisualizationUpdate;
 import edu.isi.karma.controller.update.ErrorUpdate;
-import edu.isi.karma.controller.update.SemanticTypesUpdate;
 import edu.isi.karma.controller.update.TagsUpdate;
 import edu.isi.karma.controller.update.UpdateContainer;
 import edu.isi.karma.modeling.Namespaces;
@@ -48,6 +46,7 @@ import edu.isi.karma.rep.HNode;
 import edu.isi.karma.rep.Worksheet;
 import edu.isi.karma.rep.Workspace;
 import edu.isi.karma.rep.alignment.ColumnNode;
+import edu.isi.karma.rep.alignment.ColumnSemanticTypeStatus;
 import edu.isi.karma.rep.alignment.Label;
 import edu.isi.karma.rep.alignment.LabeledLink;
 import edu.isi.karma.rep.alignment.Node;
@@ -61,9 +60,9 @@ public class SuggestAutoModelCommand extends WorksheetCommand {
 	private static Logger logger = LoggerFactory
 			.getLogger(SuggestAutoModelCommand.class);
 
-	protected SuggestAutoModelCommand(String id, String worksheetId)
+	protected SuggestAutoModelCommand(String id, String model, String worksheetId)
 			{
-		super(id, worksheetId);
+		super(id, model, worksheetId);
 		
 		/** NOTE Not saving this command in history for now since we are 
 		 * not letting CRF model assign semantic types automatically. This command 
@@ -124,7 +123,7 @@ public class SuggestAutoModelCommand extends WorksheetCommand {
 			String columnName = hNode.getColumnName().trim().replaceAll(" ", "_");
 			ColumnNode columnNode = alignment.getColumnNodeByHNodeId(hNode.getId());
 			
-			List<LabeledLink> columnNodeIncomingLinks = alignment.getIncomingLinks(columnNode.getId());
+			List<LabeledLink> columnNodeIncomingLinks = alignment.getIncomingLinksInGraph(columnNode.getId());
 			if (columnNodeIncomingLinks == null || columnNodeIncomingLinks.isEmpty()) { // SemanticType not yet assigned
 				Label propertyLabel = new Label(ns + columnName, ns, "karma");
 				alignment.addDataPropertyLink(classNode, columnNode, propertyLabel);
@@ -132,21 +131,32 @@ public class SuggestAutoModelCommand extends WorksheetCommand {
 				// Create a semantic type object
 				SemanticType type = new SemanticType(hNode.getId(), propertyLabel, internalNodeLabel, SemanticType.Origin.User, 1.0);
 				worksheet.getSemanticTypes().addType(type);
-				columnNode.setUserSelectedSemanticType(type);
+				
+				List<SemanticType> userSemanticTypes = columnNode.getUserSemanticTypes();
+				boolean duplicateSemanticType = false;
+				if (userSemanticTypes != null) {
+					for (SemanticType st : userSemanticTypes) {
+						if (st.getModelLabelString().equalsIgnoreCase(type.getModelLabelString())) {
+							duplicateSemanticType = true;
+							break;
+						}
+					}
+				}
+				if (!duplicateSemanticType)
+					columnNode.assignUserType(type);
 			} else {
 				// User-defined: do nothing
 			}
 		}
-		alignment.align();
+		if(!this.isExecutedInBatch())
+			alignment.align();
 		
 		try {
 			// Save the semantic types in the input parameter JSON
 			saveSemanticTypesInformation(worksheet, workspace, worksheet.getSemanticTypes().getListOfTypes());
-			
 			// Add the visualization update
-			c.add(new SemanticTypesUpdate(worksheet, worksheetId, alignment));
-			c.add(new AlignmentSVGVisualizationUpdate(
-					worksheetId, alignment));
+			c.append(this.computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
+
 		} catch (Exception e) {
 			logger.error("Error occured while generating the model Reason:.", e);
 			return new UpdateContainer(new ErrorUpdate(

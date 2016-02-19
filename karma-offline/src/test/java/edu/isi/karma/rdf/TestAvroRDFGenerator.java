@@ -39,6 +39,7 @@ import edu.isi.karma.kr2rml.writer.AvroKR2RMLRDFWriter;
 import edu.isi.karma.kr2rml.writer.JSONKR2RMLRDFWriter;
 import edu.isi.karma.kr2rml.writer.KR2RMLRDFWriter;
 import edu.isi.karma.rdf.GenericRDFGenerator.InputType;
+import edu.isi.karma.webserver.ContextParametersRegistry;
 
 public class TestAvroRDFGenerator extends TestJSONRDFGenerator {
 	private static Logger logger = LoggerFactory.getLogger(TestBasicJSONRDFGenerator.class);
@@ -54,7 +55,6 @@ public class TestAvroRDFGenerator extends TestJSONRDFGenerator {
 	 */
 	@Before
 	public void setUp() throws Exception {
-		rdfGen = new GenericRDFGenerator(null);
 
 		// Add the models in
 		R2RMLMappingIdentifier modelIdentifier = new R2RMLMappingIdentifier(
@@ -98,6 +98,7 @@ public class TestAvroRDFGenerator extends TestJSONRDFGenerator {
 			request.setAddProvenance(false);
 			request.setDataType(InputType.JSON);
 			request.addWriters(writers);
+			request.setContextParameters(ContextParametersRegistry.getInstance().getDefault());
 			rdfGen.generateRDF(request);
 			String rdf = sw.toString();
 			assertNotEquals(rdf.length(), 0);
@@ -131,6 +132,7 @@ public class TestAvroRDFGenerator extends TestJSONRDFGenerator {
 			request.setAddProvenance(false);
 			request.setDataType(InputType.AVRO);
 			request.addWriters(writers);
+			request.setContextParameters(ContextParametersRegistry.getInstance().getDefault());
 			rdfGen.generateRDF(request);
 			fos.flush();
 			fos.close();
@@ -146,6 +148,8 @@ public class TestAvroRDFGenerator extends TestJSONRDFGenerator {
 				reader.next();
 				count ++;
 			}
+			reader.close();
+			schemareader.close();
 			assertEquals(7, count);
 		} catch (Exception e) {
 			logger.error("testGenerateAvro2 failed:", e);
@@ -198,6 +202,7 @@ public class TestAvroRDFGenerator extends TestJSONRDFGenerator {
 			request.setAddProvenance(false);
 			request.setDataType(InputType.AVRO);
 			request.addWriters(writers);
+			request.setContextParameters(ContextParametersRegistry.getInstance().getDefault());
 			rdfGen.generateRDF(request);
 			String rdf = sw.toString();
 			assertNotEquals(rdf.length(), 0);

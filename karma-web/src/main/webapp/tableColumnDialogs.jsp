@@ -191,6 +191,8 @@
 						<label>
 							<div class="col-sm-5">On Error:</div>
 							<div class="col-sm-6"><input class="form-control" type="text" id="pythonTransformErrorDefaultValue" /></div>
+							<div class="col-sm-5">Use JSON Output:</div>
+							<div class="col-sm-6"><input class="form-control" type="checkbox" id="pythonTransformUseJSONOutput" /></div>
 						</label>
 					</div>
 					<button type="button" class="btn btn-default" id="btnErrors">View Errors</button>
@@ -222,13 +224,15 @@
 			  		<div class="cleaningOverflowDiv">
 		  				<table id="examples" class="table table-striped table-condensed">
 		  				</table>
-			  		</div>	
+			  		</div>
+					<!--<div class="coverage"><B class="figure" id="coverage"></B>% of the minimal set tested</div>	-->
+					<!--<div id="light"> <span class="active" id="red"></span> <span id="green"></span> </div> -->
 			  		<B>Recommended Examples:</B>
 			  		<div class="cleaningOverflowDiv">
 		  				<table id="recmd" class="table table-striped table-condensed">
 		  				</table>
 			  		</div>	
-			  		<B>All Records:</B>
+			  		<B>Sampled Records:</B>
 			  		<div class="cleaningOverflowDivLarge">
 			  			<table id="cleaningExamplesTable" class="table table-striped table-condensed" style="max-height:100px; overflow:auto">
 		  				</table>
@@ -276,6 +280,13 @@
 				  <div class="modal-body">
 						<h4>Select Columns:</h4>
 						<div id="glueDialogColumns"></div>
+						<div>
+							<select id="glueDialogImplWays">
+								<option value="Longest">Longest</option>
+								<option value="Shortest">Shortest</option>
+								<option value="CrossProduct">Cross Product</option>
+							</select>
+						</div>
 				  </div> <!-- /.modal-body -->
 				  <div class="modal-footer">
 				        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -297,6 +308,9 @@
 				  <div class="modal-body">
 						<h4>Select Column:</h4>
 						<div id="unfoldDialogColumns"></div>
+						<div id="unfoldOtherColumns">
+							<input type="checkbox">Use Other Columns</input>
+						</div>
 				  </div> <!-- /.modal-body -->
 				  <div class="modal-footer">
 				        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>

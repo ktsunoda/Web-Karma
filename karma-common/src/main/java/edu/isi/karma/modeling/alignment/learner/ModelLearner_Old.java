@@ -40,10 +40,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.isi.karma.config.ModelingConfiguration;
+import edu.isi.karma.config.ModelingConfigurationRegistry;
 import edu.isi.karma.modeling.ModelingParams;
 import edu.isi.karma.modeling.Uris;
 import edu.isi.karma.modeling.alignment.GraphBuilder;
 import edu.isi.karma.modeling.alignment.GraphUtil;
+import edu.isi.karma.modeling.alignment.GraphVizLabelType;
 import edu.isi.karma.modeling.alignment.GraphVizUtil;
 import edu.isi.karma.modeling.alignment.LinkFrequency;
 import edu.isi.karma.modeling.alignment.LinkIdFactory;
@@ -67,6 +69,8 @@ import edu.isi.karma.rep.alignment.SemanticType;
 import edu.isi.karma.rep.alignment.SemanticType.Origin;
 import edu.isi.karma.rep.alignment.SubClassLink;
 import edu.isi.karma.util.RandomGUID;
+import edu.isi.karma.webserver.ContextParametersRegistry;
+import edu.isi.karma.webserver.ServletContextParameterMap;
 
 public class ModelLearner_Old {
 
@@ -144,10 +148,11 @@ public class ModelLearner_Old {
 
 		GraphBuilder clonedGraphBuilder = null;
 		if (graphBuilder == null || graphBuilder.getGraph() == null) {
-			clonedGraphBuilder = new GraphBuilder(this.ontologyManager, this.nodeIdFactory, false);
+			clonedGraphBuilder = new GraphBuilder(this.ontologyManager, false);
 		} else {
-			clonedGraphBuilder = new GraphBuilder(this.ontologyManager, graphBuilder.getGraph());
+			clonedGraphBuilder = new GraphBuilder(this.ontologyManager, graphBuilder.getGraph(), false);
 		}
+		this.nodeIdFactory = clonedGraphBuilder.getNodeIdFactory();
 		return clonedGraphBuilder;
 	}
 
@@ -198,7 +203,8 @@ public class ModelLearner_Old {
 						new SortableSemanticModel_Old(sm, sn);
 				sortableSemanticModels.add(sortableSemanticModel);
 			}
-			if (count == ModelingConfiguration.getMaxCandidateModels())
+
+			if (count == ModelingConfigurationRegistry.getInstance().getModelingConfiguration(ContextParametersRegistry.getInstance().getContextParameters(ontologyManager.getContextId()).getKarmaHome()).getNumCandidateMappings())
 				break;
 		}
 
@@ -267,7 +273,7 @@ public class ModelLearner_Old {
 			return null;
 
 		int maxNumberOfSteinerNodes = columnNodes.size() * 2;
-		CandidateSteinerSets candidateSteinerSets = new CandidateSteinerSets(maxNumberOfSteinerNodes);
+		CandidateSteinerSets candidateSteinerSets = new CandidateSteinerSets(maxNumberOfSteinerNodes, ontologyManager.getContextId());
 
 		if (addedNodes == null) 
 			addedNodes = new HashSet<Node>();
@@ -280,7 +286,7 @@ public class ModelLearner_Old {
 
 		for (ColumnNode n : columnNodes) {
 
-			candidateSemanticTypes = getCandidateSemanticTypes(n, useCorrectTypes, numberOfCRFCandidates);
+			candidateSemanticTypes = n.getTopKLearnedSemanticTypes(numberOfCRFCandidates);
 			columnSemanticTypes.put(n, candidateSemanticTypes);
 
 			for (SemanticType semanticType: candidateSemanticTypes) {
@@ -416,7 +422,7 @@ public class ModelLearner_Old {
 		logger.debug("adding data property to the found internal nodes ...");
 
 		Integer count;
-		boolean allowMultipleSamePropertiesPerNode = ModelingConfiguration.isMultipleSamePropertyPerNode();
+		boolean allowMultipleSamePropertiesPerNode = ModelingConfigurationRegistry.getInstance().getModelingConfiguration(ContextParametersRegistry.getInstance().getContextParameters(ontologyManager.getContextId()).getKarmaHome()).isMultipleSamePropertyPerNode();
 		Set<Node> nodesWithSameUriOfDomain = this.graphBuilder.getUriToNodesMap().get(domainUri);
 		if (nodesWithSameUriOfDomain != null) { 
 			for (Node source : nodesWithSameUriOfDomain) {
@@ -514,40 +520,6 @@ public class ModelLearner_Old {
 		SemanticTypeMapping mappingStruct = new SemanticTypeMapping(sourceColumn, semanticType, source, link, target);
 
 		return mappingStruct;
-	}
-
-	private List<SemanticType> getCandidateSemanticTypes(ColumnNode n, boolean useCorrectType, int numberOfCRFCandidates) {
-
-		if (n == null)
-			return null;
-
-		List<SemanticType> types = new ArrayList<>();
-
-		SemanticType userSelectedType = n.getUserSelectedSemanticType();
-		if (useCorrectType && userSelectedType != null) {
-			double probability = 1.0;
-			SemanticType newType = new SemanticType(
-					userSelectedType.getHNodeId(),
-					userSelectedType.getType(),
-					userSelectedType.getDomain(),
-					userSelectedType.getOrigin(),
-					probability
-					);
-			types.add(newType);
-		} else {
-			List<SemanticType> suggestions = n.getTopKSuggestions(numberOfCRFCandidates);
-			if (suggestions != null) {
-				for (SemanticType st : suggestions) {
-					if (useCorrectType && userSelectedType != null &&
-							st.getModelLabelString().equalsIgnoreCase(userSelectedType.getModelLabelString()))
-						continue;
-					types.add(st);
-				}
-			}
-		}
-
-		return types;
-
 	}
 
 	private void updateWeights() {
@@ -670,16 +642,20 @@ public class ModelLearner_Old {
 		int numberOfAttributesWhoseTypeIsFirstCRFType = 0;
 		int numberOfAttributesWhoseTypeIsInCRFTypes = 0;
 		for (ColumnNode cn : columnNodes) {
-			SemanticType userSelectedType = cn.getUserSelectedSemanticType();
-			List<SemanticType> top4Suggestions = cn.getTopKSuggestions(4);
+			List<SemanticType> userSemanticTypes = cn.getUserSemanticTypes();
+			List<SemanticType> top4Suggestions = cn.getTopKLearnedSemanticTypes(4);
 
 			for (int i = 0; i < top4Suggestions.size(); i++) {
 				SemanticType st = top4Suggestions.get(i);
-				if (userSelectedType != null &&
-						st.getModelLabelString().equalsIgnoreCase(userSelectedType.getModelLabelString())) {
-					if (i == 0) numberOfAttributesWhoseTypeIsFirstCRFType ++;
-					numberOfAttributesWhoseTypeIsInCRFTypes ++;
-					break;
+				if (userSemanticTypes != null) {
+					for (SemanticType t : userSemanticTypes) {
+						if (st.getModelLabelString().equalsIgnoreCase(t.getModelLabelString())) {
+							if (i == 0) numberOfAttributesWhoseTypeIsFirstCRFType ++;
+							numberOfAttributesWhoseTypeIsInCRFTypes ++;
+							i = top4Suggestions.size();
+							break;
+						}
+					}
 				} 
 			}
 
@@ -693,6 +669,9 @@ public class ModelLearner_Old {
 	}
 
 	public static void test() throws Exception {
+		ServletContextParameterMap contextParameters = ContextParametersRegistry.getInstance().getDefault();
+		ModelingConfiguration modelingConfiguration = ModelingConfigurationRegistry.getInstance().getModelingConfiguration(contextParameters.getId());
+
 		//		String inputPath = Params.INPUT_DIR;
 		String outputPath = Params.OUTPUT_DIR;
 		String graphPath = Params.GRAPHS_DIR;
@@ -708,7 +687,7 @@ public class ModelLearner_Old {
 
 		List<SemanticModel> trainingData = new ArrayList<SemanticModel>();
 
-		OntologyManager ontologyManager = new OntologyManager();
+		OntologyManager ontologyManager = new OntologyManager(contextParameters.getId());
 		File ff = new File(Params.ONTOLOGY_DIR);
 		File[] files = ff.listFiles();
 		for (File f : files) {
@@ -795,7 +774,7 @@ public class ModelLearner_Old {
 					try {
 						logger.info("loading the graph ...");
 						DirectedWeightedMultigraph<Node, DefaultLink> graph = GraphUtil.importJson(graphName);
-						modelLearner.graphBuilder = new GraphBuilder(ontologyManager, graph);
+						modelLearner.graphBuilder = new GraphBuilder(ontologyManager, graph, false);
 						modelLearner.nodeIdFactory = modelLearner.graphBuilder.getNodeIdFactory();
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -804,12 +783,12 @@ public class ModelLearner_Old {
 				{
 					logger.info("building the graph ...");
 					for (SemanticModel sm : trainingData)
-						modelLearningGraph.addModel(sm);
+						modelLearningGraph.addModel(sm, false);
 					modelLearner.graphBuilder = modelLearningGraph.getGraphBuilder();
 					modelLearner.nodeIdFactory = modelLearner.graphBuilder.getNodeIdFactory();
 					// save graph to file
 					try {
-						GraphUtil.exportJson(modelLearningGraph.getGraphBuilder().getGraph(), graphName);
+						GraphUtil.exportJson(modelLearningGraph.getGraphBuilder().getGraph(), graphName, true, true);
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -822,8 +801,9 @@ public class ModelLearner_Old {
 
 				List<SortableSemanticModel_Old> topHypotheses = null;
 				if (hypothesisList != null) {
-					topHypotheses = hypothesisList.size() > ModelingConfiguration.getMaxCandidateModels() ? 
-							hypothesisList.subList(0, ModelingConfiguration.getMaxCandidateModels()) : 
+
+					topHypotheses = hypothesisList.size() > modelingConfiguration.getNumCandidateMappings() ? 
+							hypothesisList.subList(0, modelingConfiguration.getNumCandidateMappings()) : 
 								hypothesisList;
 				}
 
@@ -891,6 +871,8 @@ public class ModelLearner_Old {
 						models, 
 						newSource.getName(),
 						outName,
+						GraphVizLabelType.LocalId,
+						GraphVizLabelType.LocalUri,
 						false,
 						false);
 				//				}

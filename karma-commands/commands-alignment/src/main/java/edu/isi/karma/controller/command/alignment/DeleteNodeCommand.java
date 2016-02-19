@@ -35,8 +35,8 @@ public class DeleteNodeCommand extends WorksheetCommand {
 	private Alignment oldAlignment;
 	private DirectedWeightedMultigraph<Node, DefaultLink> oldGraph;
 		
-	protected DeleteNodeCommand(String id, String worksheetId, String alignmentId, String nodeId, String nodeLabel) {
-		super(id, worksheetId);
+	protected DeleteNodeCommand(String id, String model, String worksheetId, String alignmentId, String nodeId, String nodeLabel) {
+		super(id, model, worksheetId);
 		this.alignmentId = alignmentId;
 		this.nodeId = nodeId;
 		this.nodeLabel = nodeLabel;
@@ -78,12 +78,13 @@ public class DeleteNodeCommand extends WorksheetCommand {
 
 		try {
 			alignment.deleteForcedInternalNode(nodeId);
-			alignment.align();
+			if(!this.isExecutedInBatch())
+				alignment.align();
 		} catch (JSONException e) {
 			logger.error("Error adding Internal Node:" , e);
 		}
 
-		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace, alignment);
+		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace);
 	}
 
 	@Override
@@ -94,7 +95,7 @@ public class DeleteNodeCommand extends WorksheetCommand {
 		oldAlignment.setGraph(oldGraph);
 
 		// Get the alignment update
-		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace, oldAlignment);
+		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace);
 	}
 
 }

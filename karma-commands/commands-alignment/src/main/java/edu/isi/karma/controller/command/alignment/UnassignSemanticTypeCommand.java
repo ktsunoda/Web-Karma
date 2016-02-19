@@ -63,8 +63,8 @@ public class UnassignSemanticTypeCommand extends WorksheetCommand {
 	private static Logger logger = LoggerFactory
 			.getLogger(UnassignSemanticTypeCommand.class);
 
-	public UnassignSemanticTypeCommand(String id, String hNodeId, String worksheetId) {
-		super(id, worksheetId);
+	public UnassignSemanticTypeCommand(String id, String model, String hNodeId, String worksheetId) {
+		super(id, model, worksheetId);
 		this.hNodeId = hNodeId;
 		
 		addTag(CommandTag.Modeling);
@@ -110,6 +110,7 @@ public class UnassignSemanticTypeCommand extends WorksheetCommand {
 		
 		// Remove it from the alignment
 		ColumnNode columnNode = alignment.getColumnNodeByHNodeId(hNodeId);
+		columnNode.unassignUserType(oldSemanticType);
 		columnNode.setForced(false);
 		if (columnNode != null) {
 			Set<LabeledLink> links =  alignment.getCurrentIncomingLinksToNode(columnNode.getId());
@@ -128,7 +129,8 @@ public class UnassignSemanticTypeCommand extends WorksheetCommand {
 //			alignment.removeNode(domainNodeId);
 			
 		}
-		alignment.align();
+		if(!this.isExecutedInBatch())
+			alignment.align();
 		
 		// Get the column name
 		HNodePath currentPath = null;
@@ -155,10 +157,10 @@ public class UnassignSemanticTypeCommand extends WorksheetCommand {
 		// Update the container
 		UpdateContainer c = new UpdateContainer();
 		
-		c.add(new SemanticTypesUpdate(worksheet, worksheetId, alignment));
+		c.add(new SemanticTypesUpdate(worksheet, worksheetId));
 		// Add the alignment update
 		try {
-			c.add(new AlignmentSVGVisualizationUpdate(worksheetId, alignment));
+			c.add(new AlignmentSVGVisualizationUpdate(worksheetId));
 		} catch (Exception e) {
 			logger.error("Error occured while unassigning the semantic type!",e);
 			return new UpdateContainer(new ErrorUpdate("Error occured while unassigning the semantic type!"));
@@ -185,8 +187,8 @@ public class UnassignSemanticTypeCommand extends WorksheetCommand {
 		AlignmentManager.Instance().addAlignmentToMap(alignmentId, oldAlignment);
 		oldAlignment.setGraph(oldGraph);
 		try {
-			c.add(new SemanticTypesUpdate(worksheet, worksheetId, oldAlignment));
-			c.add(new AlignmentSVGVisualizationUpdate(worksheetId, oldAlignment));
+			c.add(new SemanticTypesUpdate(worksheet, worksheetId));
+			c.add(new AlignmentSVGVisualizationUpdate(worksheetId));
 		} catch (Exception e) {
 			logger.error("Error occured during undo of unassigning the semantic type!", e);
 			return new UpdateContainer(new ErrorUpdate("Error occured during undo of unassigning the semantic type!"));

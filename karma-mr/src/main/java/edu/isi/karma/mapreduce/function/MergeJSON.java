@@ -12,15 +12,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 public class MergeJSON extends UDF{
 	private static Logger LOG = LoggerFactory.getLogger(MergeJSON.class);
-	public Text evaluate(Text target, Text source, Text path) {
+	public Text evaluate(Text target, Text source, Text path, Text Id) {
 		try {
 			if (source == null || path == null)
 				return target;
+			String atId = "@id";
+			if (Id != null) {
+				atId = Id.toString();
+			}
 			String sourceString = source.toString();
 			String targetString = target.toString();
 			String pathString = path.toString();
 			String targetResultString = mergeJSON(sourceString, targetString,
-					pathString);
+					pathString, atId);
 			return new Text(targetResultString);
 		}catch(Exception e) {
 			LOG.error("something wrong",e );
@@ -28,14 +32,14 @@ public class MergeJSON extends UDF{
 		}
 	}
 	protected static String mergeJSON(String sourceString, String targetString,
-			String pathString) {
+			String pathString, String atId) {
 		List<String> sourceStrings = new LinkedList<String>();
 		sourceStrings.add(sourceString);
-		return mergeJSON(sourceStrings, targetString, pathString);
+		return mergeJSON(sourceStrings, targetString, pathString, atId);
 	}
 	protected static String mergeJSON(List<String> sourceStrings, String targetString,
-			String pathString) {
-		String[] array = pathString.split("\\.");
+			String pathString, String atId) {
+		String[] array = CollectJSONObject.splitPath(pathString);//pathString.split("\\.");
 		
 		JSONObject rootTargetObj = new JSONObject(targetString);
 		JSONObject targetResult = rootTargetObj;
@@ -54,7 +58,7 @@ public class MergeJSON extends UDF{
 				Object obj = targetObj.get(lastLevel);
 				for(String sourceString : sourceStrings)
 				{
-					mergeJSON(sourceString, targetObj, lastLevel, obj);
+					mergeJSON(sourceString, targetObj, lastLevel, obj, atId);
 				}
 			}
 		}
@@ -62,11 +66,11 @@ public class MergeJSON extends UDF{
 		return targetResultString;
 	}
 	private static void mergeJSON(String sourceString, JSONObject targetObj,
-			String lastLevel, Object obj) {
+			String lastLevel, Object obj, String atId) {
 		JSONObject sourceObj = new JSONObject(sourceString);
-		mergeByReplacingId(targetObj, sourceObj, lastLevel, obj);
-		mergeJSONObject(sourceObj, obj);
-		mergeIntoJSONArray(sourceObj, obj);
+		mergeByReplacingId(targetObj, sourceObj, lastLevel, obj, atId);
+		mergeJSONObject(sourceObj, obj, atId);
+		mergeIntoJSONArray(sourceObj, obj, atId);
 	}
 	protected static List<JSONObject> collectObjectsFromJSONPath(List<String> pathElements, Object targetObj)
 	{
@@ -116,27 +120,27 @@ public class MergeJSON extends UDF{
 		return targetObj;
 	}
 	protected static void mergeByReplacingId(JSONObject targetObj, JSONObject sourceObj,
-			String lastLevel, Object obj) {
-		if (obj instanceof String && obj.equals(sourceObj.get("@id"))) {
+			String lastLevel, Object obj, String atId) {
+		if (obj instanceof String && obj.equals(sourceObj.get(atId))) {
 			targetObj.put(lastLevel, sourceObj);
 		}
 	}
-	protected static void mergeIntoJSONArray(JSONObject sourceObj, Object obj) {
+	protected static void mergeIntoJSONArray(JSONObject sourceObj, Object obj, String atId) {
 		if (obj instanceof JSONArray) {
 			JSONArray tmpArray = (JSONArray)obj;
 			for (int i = 0; i < tmpArray.length(); i++) {
-				if (tmpArray.get(i).equals(sourceObj.get("@id"))) {
+				if (tmpArray.get(i).equals(sourceObj.get(atId))) {
 					tmpArray.put(i, sourceObj);
 				}
 				Object o = tmpArray.get(i);
-				mergeJSONObject(sourceObj, o);
+				mergeJSONObject(sourceObj, o, atId);
 			}
 		}
 	}
-	protected static void mergeJSONObject(JSONObject sourceObj, Object o) {
+	protected static void mergeJSONObject(JSONObject sourceObj, Object o, String atId) {
 		if (o instanceof JSONObject) {
 			JSONObject t = (JSONObject)o;
-			if (t.has("@id") && t.get("@id").equals(sourceObj.get("@id"))) {
+			if (t.has(atId) && t.get(atId).equals(sourceObj.get(atId))) {
 				@SuppressWarnings("rawtypes")
 				Iterator itr = sourceObj.keys();
 				while(itr.hasNext()) {

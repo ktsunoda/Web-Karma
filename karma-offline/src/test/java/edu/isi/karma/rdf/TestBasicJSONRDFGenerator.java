@@ -19,6 +19,7 @@ import edu.isi.karma.kr2rml.mapping.R2RMLMappingIdentifier;
 import edu.isi.karma.kr2rml.planning.UserSpecifiedRootStrategy;
 import edu.isi.karma.kr2rml.writer.JSONKR2RMLRDFWriter;
 import edu.isi.karma.rdf.GenericRDFGenerator.InputType;
+import edu.isi.karma.webserver.ContextParametersRegistry;
 
 public class TestBasicJSONRDFGenerator extends TestJSONRDFGenerator {
 	private static Logger logger = LoggerFactory.getLogger(TestBasicJSONRDFGenerator.class);
@@ -34,7 +35,6 @@ public class TestBasicJSONRDFGenerator extends TestJSONRDFGenerator {
 	 */
 	@Before
 	public void setUp() throws Exception {
-		rdfGen = new GenericRDFGenerator(null);
 
 		// Add the models in
 		R2RMLMappingIdentifier modelIdentifier = new R2RMLMappingIdentifier(
@@ -59,11 +59,6 @@ public class TestBasicJSONRDFGenerator extends TestJSONRDFGenerator {
 	public void tearDown() throws Exception {
 	}
 
-	/**
-	 * Test method for
-	 * {@link edu.isi.karma.rdf.JSONRDFGenerator#generateRDF(java.lang.String, java.lang.String, boolean, java.io.PrintWriter)}
-	 * .
-	 */
 	@Test
 	public void testGenerateRDF1() {
 		try {
@@ -87,6 +82,7 @@ public class TestBasicJSONRDFGenerator extends TestJSONRDFGenerator {
 			request.setAddProvenance(false);
 			request.setDataType(InputType.JSON);
 			request.addWriter(writer);
+			request.setContextParameters(ContextParametersRegistry.getInstance().getDefault());
 			rdfGen.generateRDF(request);
 			String rdf = sw.toString();
 			assertNotEquals(rdf.length(), 0);
@@ -113,6 +109,7 @@ public class TestBasicJSONRDFGenerator extends TestJSONRDFGenerator {
 			request.setDataType(InputType.JSON);
 			request.setStrategy(new UserSpecifiedRootStrategy("http://isi.edu/integration/karma/dev#TriplesMap_6c6ae57b-f0ac-4443-9a49-4ae5d2e20630"));
 			request.addWriter(writer);
+			request.setContextParameters(ContextParametersRegistry.getInstance().getDefault());
 			rdfGen.generateRDF(request);
 			
 			String rdf = sw.toString();
@@ -120,17 +117,13 @@ public class TestBasicJSONRDFGenerator extends TestJSONRDFGenerator {
 			String[] lines = rdf.split("(\r\n|\n)");
 			int count = lines.length;
 			
-			assertEquals(365, count);
+			assertEquals(358, count);
 		} catch (Exception e) {
 			logger.error("testGenerateRDF1 failed:", e);
 			fail("Execption: " + e.getMessage());
 		}
 	}
-	/**
-	 * Test method for
-	 * {@link edu.isi.karma.rdf.JSONRDFGenerator#generateRDF(java.lang.String, java.lang.String, boolean, java.io.PrintWriter)}
-	 * .
-	 */
+	
 	@Test
 	public void testGenerateRDF2() {
 		try {

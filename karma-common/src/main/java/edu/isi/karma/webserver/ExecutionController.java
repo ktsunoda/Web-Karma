@@ -68,10 +68,6 @@ public class ExecutionController {
 
 		for (Class<? extends CommandFactory> subType : subTypes)
 		{
-			if(subType.getClass().getName().contains("FetchTransformingData"))
-			{
-				System.out.println("subType: Hello");
-			}
 			if(!Modifier.isAbstract(subType.getModifiers()) && !subType.isInterface())
 				try
 			{
@@ -111,7 +107,7 @@ public class ExecutionController {
 			if (cf instanceof JSONInputCommandFactory) {
 				String newInfo = request.getParameter("newInfo");
 				try {
-					return cf.createCommand(newInfo == null ? null : new JSONArray(newInfo), workspace);
+					return cf.createCommand(newInfo == null ? null : new JSONArray(newInfo), Command.NEW_MODEL, workspace);
 				} catch (Exception e) {
 					logger.error("Error getting command!!", e);
 					return null;

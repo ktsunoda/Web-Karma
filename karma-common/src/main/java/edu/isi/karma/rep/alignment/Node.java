@@ -103,6 +103,8 @@ public abstract class Node implements Comparable<Node> {
 	}
 	
 	public Set<String> getModelIds() {
+		if (this.modelIds == null)
+			return new HashSet<String>();
 		return modelIds;
 	}
 
@@ -120,7 +122,7 @@ public abstract class Node implements Comparable<Node> {
         }
 
         Node node = (Node) obj;
-        return this.id == node.getId();
+        return this.id.equals(node.getId());
     }
     
     @Override

@@ -49,8 +49,8 @@ public class GetPropertiesCommand extends WorksheetCommand {
 	
 	private static Logger logger = LoggerFactory.getLogger(GetPropertiesCommand.class.getSimpleName());
 	
-	protected GetPropertiesCommand(String id, String worksheetId, INTERNAL_PROP_RANGE propertiesRange, String classURI, String domainURI, String rangeURI) {
-		super(id, worksheetId);
+	protected GetPropertiesCommand(String id, String model, String worksheetId, INTERNAL_PROP_RANGE propertiesRange, String classURI, String domainURI, String rangeURI) {
+		super(id, model, worksheetId);
 		this.propertiesRange = propertiesRange;
 		this.classURI = classURI;
 		this.domainURI = domainURI;
@@ -117,7 +117,7 @@ public class GetPropertiesCommand extends WorksheetCommand {
 				properties.add(new DataPropertyLink(label.getUri(), label));
 			}
 		} else if(propertiesRange == INTERNAL_PROP_RANGE.existingProperties) {
-			Alignment alignment = AlignmentManager.Instance().getAlignmentOrCreateIt(workspace.getId(), worksheetId, ontMgr);
+			Alignment alignment = AlignmentManager.Instance().getAlignment(workspace.getId(), worksheetId);
 			Set<String> steinerTreeNodeIds = new HashSet<String>();
 			if (alignment != null && !alignment.isEmpty()) {
 				DirectedWeightedMultigraph<Node, LabeledLink> steinerTree = alignment.getSteinerTree(); 

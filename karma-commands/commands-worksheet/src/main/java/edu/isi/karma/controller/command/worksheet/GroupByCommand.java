@@ -51,10 +51,10 @@ public class GroupByCommand extends WorksheetSelectionCommand {
 		updateType, hNodeId, worksheetId
 	}
 
-	protected GroupByCommand(String id,String worksheetId, 
+	protected GroupByCommand(String id, String model, String worksheetId, 
 			String hTableId, String hNodeId, 
 			String selectionId) {
-		super(id, worksheetId, selectionId);
+		super(id, model, worksheetId, selectionId);
 		this.hNodeId = hNodeId;
 		addTag(CommandTag.Transformation);
 	}
@@ -123,12 +123,12 @@ public class GroupByCommand extends WorksheetSelectionCommand {
 			WorksheetUpdateFactory.detectSelectionStatusChange(worksheetId, workspace, this);
 			c.add(new WorksheetListUpdate());
 			if (newws == null)
-				c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(oldws.getId(), getSuperSelection(oldws)));
+				c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(oldws.getId(), getSuperSelection(oldws), workspace.getContextId()));
 			if (newws != null) {
-				c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(newws.getId(), SuperSelectionManager.DEFAULT_SELECTION));
+				c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(newws.getId(), SuperSelectionManager.DEFAULT_SELECTION, workspace.getContextId()));
 				//c.append(WorksheetUpdateFactory.createWorksheetHierarchicalAndCleaningResultsUpdates(newws.getId()));
-				Alignment alignment = AlignmentManager.Instance().getAlignmentOrCreateIt(workspace.getId(), newws.getId(), workspace.getOntologyManager());
-				c.append(WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(newws.getId(), workspace, alignment));
+				Alignment alignment = AlignmentManager.Instance().createAlignment(workspace.getId(), newws.getId(), workspace.getOntologyManager());
+				c.append(WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(newws.getId(), workspace));
 			}
 			//c.append(WorksheetUpdateFactory.createWorksheetHierarchicalAndCleaningResultsUpdates(oldws.getId()));
 			c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
@@ -156,7 +156,7 @@ public class GroupByCommand extends WorksheetSelectionCommand {
 			ndid.removeNestedTable();
 			//remove the new column
 			currentTable.removeHNode(newHNodeId, worksheet);
-			c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet)));
+			c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, getSuperSelection(worksheet), workspace.getContextId()));
 			c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
 		}
 		return c;

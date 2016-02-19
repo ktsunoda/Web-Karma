@@ -30,6 +30,8 @@ import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.CharStream;
 import org.antlr.runtime.Token;
 
+import edu.isi.karma.cleaning.grammartree.TNode;
+
 public class Ruler {
 	String Org = "";
 	String Trgt = "";
@@ -207,6 +209,10 @@ public class Ruler {
 			} else if (t.getType() == Tokenizer.END) {
 				mytype = TNode.ENDTYP;
 				txt = "";
+			}
+			else if(t.getType() == Tokenizer.WRD){
+				mytype = TNode.WORD;
+				txt = t.getText();
 			}
 			TNode tx = new TNode(mytype, txt);
 			vec.add(tx);

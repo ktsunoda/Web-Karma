@@ -3,6 +3,8 @@ package edu.isi.karma.cleaning;
 import java.util.Map;
 import java.util.Vector;
 
+import edu.isi.karma.cleaning.grammartree.Partition;
+
 public class ProgTracker {
 	public static void printPartition(Vector<Partition> pars) {
 		System.out.println("-----------");
@@ -27,7 +29,8 @@ public class ProgTracker {
 		System.out.println("TOMERGE:" + a + "\n" + b);
 	}
 
-	public static void printUnlabeledData(Map<?, ?> dicttmp) {
+	@SuppressWarnings("rawtypes")
+	public static void printUnlabeledData(Map dicttmp) {
 		for (Object xkey : dicttmp.keySet()) {
 			System.out.println(String.format("Entry: %s,%f", xkey,dicttmp.get(xkey)));
 		}

@@ -24,10 +24,10 @@ package edu.isi.karma.controller.update;
 import java.util.Set;
 
 import edu.isi.karma.config.UIConfiguration;
+import edu.isi.karma.config.UIConfigurationRegistry;
 import edu.isi.karma.controller.command.Command;
 import edu.isi.karma.controller.command.selection.Selection;
 import edu.isi.karma.controller.command.selection.SuperSelection;
-import edu.isi.karma.modeling.alignment.Alignment;
 import edu.isi.karma.rep.HNode;
 import edu.isi.karma.rep.HTable;
 import edu.isi.karma.rep.RepFactory;
@@ -36,22 +36,24 @@ import edu.isi.karma.rep.Workspace;
 
 public class WorksheetUpdateFactory {
 
-	public static UpdateContainer createWorksheetHierarchicalAndCleaningResultsUpdates(String worksheetId, SuperSelection sel) {
+	public static UpdateContainer createWorksheetHierarchicalAndCleaningResultsUpdates(String worksheetId, SuperSelection sel, String contextId) {
 		UpdateContainer c = new UpdateContainer();
-		createWorksheetHierarchicalAndCleaningResultsUpdates(worksheetId, c, sel);
+		createWorksheetHierarchicalAndCleaningResultsUpdates(worksheetId, c, sel, contextId);
 		return c;
 	}
 	private static void createWorksheetHierarchicalAndCleaningResultsUpdates(
-			String worksheetId, UpdateContainer c, SuperSelection sel) {
-		boolean showCleaningCharts = UIConfiguration.Instance().isD3ChartsEnabled();
+			String worksheetId, UpdateContainer c, SuperSelection sel, String contextId) {
+		UIConfiguration uiConfiguration = UIConfigurationRegistry.getInstance().getUIConfiguration(contextId);
+		boolean showCleaningCharts = uiConfiguration.isD3ChartsEnabled();
 		if (showCleaningCharts)
 			c.add(new WorksheetCleaningUpdate(worksheetId, true, sel));
 		createWorksheetHierarchicalUpdates(worksheetId, c, sel);
 	}
 
-	public static UpdateContainer createWorksheetHierarchicalUpdates(String worksheetId, SuperSelection sel) {
+	public static UpdateContainer createWorksheetHierarchicalUpdates(String worksheetId, SuperSelection sel, String contextId) {
 		UpdateContainer c = new UpdateContainer();
-		boolean showCleaningCharts = UIConfiguration.Instance().isD3ChartsEnabled();
+		UIConfiguration uiConfiguration = UIConfigurationRegistry.getInstance().getUIConfiguration(contextId);
+		boolean showCleaningCharts = uiConfiguration.isD3ChartsEnabled();
 		if (showCleaningCharts)
 			c.add(new WorksheetCleaningUpdate(worksheetId, false, sel));
 		createWorksheetHierarchicalUpdates(worksheetId, c, sel);
@@ -64,18 +66,18 @@ public class WorksheetUpdateFactory {
 		c.add(new WorksheetDataUpdate(worksheetId, sel));
 		c.add(new WorksheetSuperSelectionListUpdate(worksheetId));
 	}
-	public static UpdateContainer createRegenerateWorksheetUpdates(String worksheetId, SuperSelection sel) {
+	public static UpdateContainer createRegenerateWorksheetUpdates(String worksheetId, SuperSelection sel, String contextId) {
 		UpdateContainer c = new UpdateContainer();
 		c.add(new RegenerateWorksheetUpdate(worksheetId));
-		createWorksheetHierarchicalAndCleaningResultsUpdates(worksheetId, c, sel);
+		createWorksheetHierarchicalAndCleaningResultsUpdates(worksheetId, c, sel, contextId);
 		return c;
 	}
-	public static UpdateContainer createSemanticTypesAndSVGAlignmentUpdates(String worksheetId, Workspace workspace, Alignment alignment)
+	public static UpdateContainer createSemanticTypesAndSVGAlignmentUpdates(String worksheetId, Workspace workspace)
 	{
 		Worksheet worksheet = workspace.getWorksheet(worksheetId);
 		UpdateContainer c = new UpdateContainer();
-		c.add(new SemanticTypesUpdate(worksheet, worksheetId, alignment));
-		c.add(new AlignmentSVGVisualizationUpdate(worksheetId, alignment));
+		c.add(new SemanticTypesUpdate(worksheet, worksheetId));
+		c.add(new AlignmentSVGVisualizationUpdate(worksheetId));
 		return c;
 	}
 

@@ -24,11 +24,13 @@ package edu.isi.karma.rdf;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.isi.karma.config.ModelingConfiguration;
+import edu.isi.karma.config.ModelingConfigurationRegistry;
 import edu.isi.karma.controller.command.CommandException;
 import edu.isi.karma.controller.command.ICommand.CommandTag;
 import edu.isi.karma.controller.history.WorksheetCommandHistoryExecutor;
@@ -38,6 +40,8 @@ import edu.isi.karma.rep.Workspace;
 import edu.isi.karma.rep.WorkspaceManager;
 import edu.isi.karma.webserver.ExecutionController;
 import edu.isi.karma.webserver.KarmaException;
+import edu.isi.karma.webserver.ServletContextParameterMap;
+import edu.isi.karma.webserver.WorkspaceKarmaHomeRegistry;
 import edu.isi.karma.webserver.WorkspaceRegistry;
 
 public abstract class RdfGenerator {
@@ -47,12 +51,14 @@ public abstract class RdfGenerator {
 	public RdfGenerator(String selectionName) {
 		this.selectionName = selectionName;
 	}
-	protected Workspace initializeWorkspace() {
+	protected Workspace initializeWorkspace(ServletContextParameterMap contextParameters) {
 		
-		Workspace workspace = WorkspaceManager.getInstance().createWorkspace();
-        WorkspaceRegistry.getInstance().register(new ExecutionController(workspace));
-        ModelingConfiguration.load();
-        ModelingConfiguration.setManualAlignment(true);
+		Workspace workspace = WorkspaceManager.getInstance().createWorkspace(contextParameters.getId());
+		WorkspaceRegistry.getInstance().register(new ExecutionController(workspace));
+		WorkspaceKarmaHomeRegistry.getInstance().register(workspace.getId(), contextParameters.getKarmaHome());
+		ModelingConfiguration modelingConfiguration = ModelingConfigurationRegistry.getInstance().register(contextParameters.getId());        
+        modelingConfiguration.setManualAlignment();
+
         return workspace;
         
 	}
@@ -60,6 +66,7 @@ public abstract class RdfGenerator {
 	protected void removeWorkspace(Workspace workspace) {
 		WorkspaceManager.getInstance().removeWorkspace(workspace.getId());
 	    WorkspaceRegistry.getInstance().deregister(workspace.getId());
+	    WorkspaceKarmaHomeRegistry.getInstance().deregister(workspace.getId());
 	}
 
 	protected void applyHistoryToWorksheet(Workspace workspace, Worksheet worksheet,
@@ -69,7 +76,7 @@ public abstract class RdfGenerator {
 		{
 			List<CommandTag> tags = new ArrayList<CommandTag>();
 			tags.add(CommandTag.Transformation);
-			wchr.executeCommandsByTags(tags, mapping.getWorksheetHistory());
+			wchr.executeCommandsByTags(tags, new JSONArray(mapping.getWorksheetHistoryString()));
 		}
 		catch (CommandException | KarmaException e)
 		{

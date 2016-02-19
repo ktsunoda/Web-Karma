@@ -24,6 +24,11 @@
 		    <version>${project.version}</version>
 	    </dependency>
 		<dependency>
+		    <groupId>edu.isi</groupId>
+		    <artifactId>karma-offline</artifactId>
+		    <version>${project.version}</version>
+	    </dependency>
+		<dependency>
 			<groupId>log4j</groupId>
 			<artifactId>log4j</artifactId>
 		</dependency>
@@ -36,6 +41,11 @@
 			<artifactId>slf4j-log4j12</artifactId>
 		</dependency>
 
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-csv</artifactId>
+		    <version>1.0</version>
+		</dependency>
 
         <dependency>
 			<groupId>org.mongodb</groupId>

@@ -1,7 +1,5 @@
 package edu.isi.karma.modeling.alignment.learner;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,21 +7,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+public abstract class Coherence {
 
-public class Coherence {
+//	private static Logger logger = LoggerFactory.getLogger(Coherence.class);
+	protected List<CoherenceItem> items;
+	protected int itemsCount;
 
-	private static Logger logger = LoggerFactory.getLogger(Coherence.class);
-	private List<CoherenceItem> items;
-	private int itemsCount;
-
-	private static int NUM_OF_MAX_SIZE_PATTERNS = 5;
-	private Map<String, Integer> patternSize;
-	private Map<String, String> patternGuid;
-	private String[] maxPatterns;
-	private int numOfElementsInMaxPatterns;
-	private HashMap<String, Integer> patternIndex;
+	protected static int NUM_OF_MAX_SIZE_PATTERNS = 5;
+	protected Map<String, Integer> patternSize;
+	protected Map<String, String> patternGuid;
+	protected String[] maxPatterns;
+	protected int numOfElementsInMaxPatterns;
+	protected HashMap<String, Integer> patternIndex;
 	
 	public Coherence() {
 		this.items = new ArrayList<>();
@@ -70,13 +65,14 @@ public class Coherence {
 		return coherenceList;
 	}
 	
-	public void updateCoherence(Set<String> modelIds) {
+	protected void updateCoherence(Set<String> modelIds) {
 		
 		if (modelIds == null || modelIds.isEmpty())
 			return;
 		
+//		this.itemsCount ++;
+
 //		logger.debug("update coherence data ...");
-		this.itemsCount ++;
 //		System.out.println("=========================" + nodesCount);
 //		System.out.println("=========================" + n.getModelIds() != null ? n.getModelIds().size() : "null");
 		Integer index;
@@ -159,34 +155,9 @@ public class Coherence {
 //		
 //		return value.doubleValue();
 //	}
-	
-	public double getCoherenceValue() {
-		
-		if (this.itemsCount == 0) {
-			logger.debug("cannot compute coherence when number of nodes is zero!");
-			return Double.MIN_VALUE;
-		}
-		
 
-		BigDecimal value = BigDecimal.ZERO;
-		
-		BigDecimal denominator = BigDecimal.ONE;
-		BigDecimal factor = new BigDecimal(this.itemsCount);
-		BigDecimal b;
-		
-//		List<Integer> coherenceList = getCoherenceList();
-//		for (int i = 0; i < coherenceList.size(); i++) {
-//			int size = coherenceList.get(i);
-		for (int i = 0; i < numOfElementsInMaxPatterns; i++) {
-			int size = patternSize.get(maxPatterns[i]);
-			denominator = denominator.multiply(factor);
-			b = new BigDecimal((double)size);
-			b= b.divide(denominator, 5, RoundingMode.HALF_UP);
-			value = value.add(b);
-		}
-		
-		return Math.min(1.0, value.doubleValue());
-	}
+	public abstract double getCoherenceValue();
+
 
 //	public void computeCoherence(Set<Node> nodes) {
 //		

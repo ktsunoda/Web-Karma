@@ -52,8 +52,8 @@ import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
 import edu.isi.karma.controller.command.selection.SuperSelection;
-import edu.isi.karma.controller.command.selection.SuperSelectionManager;
-import edu.isi.karma.modeling.semantictypes.SemanticTypeUtil;
+//import edu.isi.karma.controller.command.selection.SuperSelectionManager;
+//import edu.isi.karma.modeling.semantictypes.SemanticTypeUtil;
 import edu.isi.karma.rep.Worksheet;
 import edu.isi.karma.rep.Workspace;
 import edu.isi.karma.rep.alignment.ColumnNode;
@@ -77,15 +77,31 @@ public class SemanticModel {
 	protected final static int maxPathLengthForEvaluation = 2;
 	protected Workspace workspace;
 	protected Worksheet worksheet;
-	private SuperSelection selection;
+//	private SuperSelection selection;
+	
+	protected Double accuracy;
+	protected Double mrr;
+	
+	public SemanticModel(String id,
+			DirectedWeightedMultigraph<Node, LabeledLink> graph, boolean suggestSemanticTypes) {
+
+		this.id = id;
+		this.graph = graph;
+
+		this.sourceColumns = this.getColumnNodes();
+		this.mappingToSourceColumns = new HashMap<ColumnNode, ColumnNode>();
+		for (ColumnNode c : this.sourceColumns)
+			this.mappingToSourceColumns.put(c, c);
+	}
+	
 	public SemanticModel(String id,
 			DirectedWeightedMultigraph<Node, LabeledLink> graph) {
 
 		this.id = id;
 		this.graph = graph;
-		this.selection = SuperSelectionManager.DEFAULT_SELECTION;
-		this.setSuggestedTypesForColumnNodes();
-		this.setUserSelectedTypeForColumnNodes();
+//		this.selection = SuperSelectionManager.DEFAULT_SELECTION;
+//		this.setLearnedTypesForColumnNodes();
+		this.setUserTypesForColumnNodes();
 
 		this.sourceColumns = this.getColumnNodes();
 		this.mappingToSourceColumns = new HashMap<ColumnNode, ColumnNode>();
@@ -101,10 +117,10 @@ public class SemanticModel {
 		this.worksheet = worksheet;
 		this.id = id;
 		this.graph = graph;
-		this.selection = sel;
-		this.setSuggestedTypesForColumnNodes();
-		this.setUserSelectedTypeForColumnNodes();
-
+//		this.selection = sel;
+//		this.setLearnedTypesForColumnNodes();
+		this.setUserTypesForColumnNodes();
+		
 		this.sourceColumns = this.getColumnNodes();
 		this.mappingToSourceColumns = new HashMap<ColumnNode, ColumnNode>();
 		for (ColumnNode c : this.sourceColumns)
@@ -119,7 +135,7 @@ public class SemanticModel {
 		this.id = id;
 		this.graph = graph;
 		this.sourceColumns = sourceColumns;
-		this.selection = SuperSelectionManager.DEFAULT_SELECTION;
+//		this.selection = SuperSelectionManager.DEFAULT_SELECTION;
 		this.mappingToSourceColumns = mappingToSourceColumns;
 	}
 	
@@ -130,7 +146,7 @@ public class SemanticModel {
 		this.graph = semanticModel.getGraph();
 		this.sourceColumns = semanticModel.getSourceColumns();
 		this.mappingToSourceColumns = semanticModel.getMappingToSourceColumns();
-		this.selection = SuperSelectionManager.DEFAULT_SELECTION;
+//		this.selection = SuperSelectionManager.DEFAULT_SELECTION;
 	}
 	
 	public String getId() {
@@ -165,6 +181,22 @@ public class SemanticModel {
 		return sourceColumns;
 	}
 	
+	public Double getAccuracy() {
+		return accuracy;
+	}
+
+	public void setAccuracy(Double accuracy) {
+		this.accuracy = accuracy;
+	}
+
+	public Double getMrr() {
+		return mrr;
+	}
+
+	public void setMrr(Double mrr) {
+		this.mrr = mrr;
+	}
+
 	public Set<InternalNode> getInternalNodes() {
 		Set<InternalNode> internalNodes = new HashSet<InternalNode>();
 		if (this.graph != null) {
@@ -183,28 +215,26 @@ public class SemanticModel {
 					columnNodes.add((ColumnNode)n);
 		}
 		return columnNodes;
-		
-
 	}
 
-	private void setSuggestedTypesForColumnNodes() {
-		
-		if (this.graph == null)
-			return;
-		
-		for (Node n : this.graph.vertexSet()) {
-			
-			if (!(n instanceof ColumnNode)) continue;
-			
-			ColumnNode cn = (ColumnNode)n;
-						
-			List<SemanticType> suggestedSemanticTypes = 
-					new SemanticTypeUtil().getColumnSemanticSuggestions(workspace, worksheet, cn, 4, selection);
-			cn.setSuggestedSemanticTypes(suggestedSemanticTypes);
-		}
-	}
+//	private void setLearnedTypesForColumnNodes() {
+//		
+//		if (this.graph == null)
+//			return;
+//		
+//		for (Node n : this.graph.vertexSet()) {
+//			
+//			if (!(n instanceof ColumnNode)) continue;
+//			
+//			ColumnNode cn = (ColumnNode)n;
+//						
+//			List<SemanticType> learnedSemanticTypes = 
+//					new SemanticTypeUtil().getColumnSemanticSuggestions(workspace, worksheet, cn, 4, selection);
+//			cn.setLearnedSemanticTypes(learnedSemanticTypes);
+//		}
+//	}
 	
-	private void setUserSelectedTypeForColumnNodes() {
+	private void setUserTypesForColumnNodes() {
 		
 		if (this.graph == null)
 			return;
@@ -216,11 +246,12 @@ public class SemanticModel {
 			ColumnNode cn = (ColumnNode)n;
 						
 			Set<LabeledLink> incomingLinks = this.graph.incomingEdgesOf(n);
-			if (incomingLinks != null && incomingLinks.size() == 1) {
-				LabeledLink link = incomingLinks.toArray(new LabeledLink[0])[0];
-				Node domain = link.getSource();
-				SemanticType st = new SemanticType(cn.getHNodeId(), link.getLabel(), domain.getLabel(), Origin.User, 1.0);
-				cn.setUserSelectedSemanticType(st);
+			if (incomingLinks != null) {
+				for (LabeledLink link : incomingLinks) {
+					Node domain = link.getSource();
+					SemanticType st = new SemanticType(cn.getHNodeId(), link.getLabel(), domain.getLabel(), Origin.User, 1.0);
+					cn.assignUserType(st);
+				}
 			} else
 				logger.debug("The column node " + ((ColumnNode)n).getColumnName() + " does not have any domain or it has more than one domain.");
 		}
@@ -234,6 +265,10 @@ public class SemanticModel {
 	}
 
 	public ModelEvaluation evaluate(SemanticModel baseModel) {
+		return evaluate(baseModel, false);
+	}
+
+	public ModelEvaluation evaluate(SemanticModel baseModel, boolean ignoreSemanticTypes) {
 
 		if (baseModel == null || baseModel.getGraph() == null || this.getGraph() == null)
 			return new ModelEvaluation(null, null, null);
@@ -247,7 +282,7 @@ public class SemanticModel {
 				baseNodeIds.put(n, n.getId());
 		}
 		
-		Set<String> baseTriples = getTriples(baseModel.getGraph(), baseNodeIds);
+		Set<String> baseTriples = getTriples(baseModel.getGraph(), baseNodeIds, ignoreSemanticTypes);
 		Set<String> targetTriples = null;
 		List<HashMap<Node,String>> targetNodeIdSets = getPossibleNodeIdSets();
 		if (targetNodeIdSets == null)
@@ -258,7 +293,7 @@ public class SemanticModel {
 		double precision, recall, fmeasure;
 		for (HashMap<Node,String> targetNodeIds : targetNodeIdSets) {
 //			System.out.println("==============================");
-			targetTriples = getTriples(this.getGraph(), targetNodeIds);
+			targetTriples = getTriples(this.getGraph(), targetNodeIds, ignoreSemanticTypes);
 			precision = getPrecision(baseTriples, targetTriples);
 			recall = getRecall(baseTriples, targetTriples);
 			fmeasure = 2 * precision * recall / (precision + recall);
@@ -272,7 +307,8 @@ public class SemanticModel {
 		return new ModelEvaluation(0.0, bestPrecision, bestRecall);
 	}
 	
-	private Set<String> getTriples(DirectedWeightedMultigraph<Node, LabeledLink> g, HashMap<Node,String> nodeIds) {
+	private Set<String> getTriples(DirectedWeightedMultigraph<Node, LabeledLink> g, HashMap<Node,String> nodeIds, 
+			boolean ignoreSemanticTypes) {
 		
 		String separator = "|";
 		Set<String> triples = new HashSet<String>();
@@ -281,7 +317,8 @@ public class SemanticModel {
 		
 		String s, p, o, triple;
 		for (LabeledLink l : g.edgeSet()) {
-			
+			if (ignoreSemanticTypes && !(l.getTarget() instanceof InternalNode))
+				continue;
 			s = nodeIds.get(l.getSource());
 			o = nodeIds.get(l.getTarget());
 			p = l.getLabel().getUri();
@@ -397,7 +434,7 @@ public class SemanticModel {
 				List<List<String>> permList = new ArrayList<List<String>>();
 				permList.addAll(permutations);
 				
-				interval = interval / nodeGroup.size();
+				interval = interval / BigIntegerMath.factorial(nodeGroup.size()).intValue();
 				List<String> perm;
 				int k = 0, count = 1;
 				for (int i = 0; i < nodeIdSets.size(); i++) {
@@ -684,7 +721,7 @@ public class SemanticModel {
 	}
 	
 	public void writeGraphviz(String filename, boolean showNodeMetaData, boolean showLinkMetaData) throws IOException {
-		GraphVizUtil.exportSemanticModelToGraphviz(this, showNodeMetaData, showLinkMetaData, filename);
+		GraphVizUtil.exportSemanticModelToGraphviz(this, GraphVizLabelType.LocalId, GraphVizLabelType.LocalUri, showNodeMetaData, showLinkMetaData, filename);
 	}
 	
 	public void writeJson(String filename) throws IOException {
@@ -734,7 +771,7 @@ public class SemanticModel {
 		}
 		writer.name("graph");
 		if (this.graph == null) writer.value(nullStr);
-		else GraphUtil.writeGraph(GraphUtil.asDefaultGraph(this.graph), writer);
+		else GraphUtil.writeGraph(GraphUtil.asDefaultGraph(this.graph), writer, false, false);
 //		else GraphUtil.writeGraph(workspace, worksheet, GraphUtil.asDefaultGraph(this.graph), writer);
 		writer.endObject();
 	}

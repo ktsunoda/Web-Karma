@@ -20,8 +20,9 @@
  ******************************************************************************/
 package edu.isi.karma.rep;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import edu.isi.karma.modeling.alignment.AlignmentManager;
 
@@ -32,9 +33,9 @@ import edu.isi.karma.modeling.alignment.AlignmentManager;
  */
 public class WorkspaceManager {
 	
-	private int nextId = 1;
+	private AtomicInteger nextId = new AtomicInteger(1);
 	
-	private final Map<String, Workspace> workspaces = new HashMap<String, Workspace>();
+	private final Map<String, Workspace> workspaces = new ConcurrentHashMap<String, Workspace>();
 	
 	private static WorkspaceManager singleton = new WorkspaceManager();
 	
@@ -46,22 +47,22 @@ public class WorkspaceManager {
 		return new WorkspaceManager();
 	}
 	
-	public Workspace createWorkspace() {
+	public Workspace createWorkspace(String contextId) {
 		String id = getNewId("WSP");
-		Workspace wsp = new Workspace(id);
+		Workspace wsp = new Workspace(id, contextId);
 		workspaces.put(id, wsp);
 		return wsp;
 	}
 	
-	public Workspace createWorkspaceWithPreferencesId(String preferenceId) {
+	public Workspace createWorkspaceWithPreferencesId(String preferenceId, String contextId) {
 		String id = getNewId("WSP");
-		Workspace wsp = new Workspace(id, preferenceId);
+		Workspace wsp = new Workspace(id, preferenceId, contextId);
 		workspaces.put(id, wsp);
 		return wsp;
 	}
 	
 	public String getNewId(String prefix) {
-		return prefix + (nextId++);
+		return prefix + (nextId.getAndIncrement());
 	}
 	
 	public void removeWorkspace(String workspaceId) {

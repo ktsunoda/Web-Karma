@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import edu.isi.karma.kr2rml.writer.KR2RMLRDFWriter;
 import edu.isi.karma.rdf.GenericRDFGenerator.InputType;
+import edu.isi.karma.webserver.ContextParametersRegistry;
 import edu.isi.karma.webserver.KarmaException;
 
 
@@ -46,12 +47,12 @@ import edu.isi.karma.webserver.KarmaException;
  */
 public abstract class TestJSONRDFGenerator extends TestRdfGenerator{
 
-	protected GenericRDFGenerator rdfGen;
+	protected final GenericRDFGenerator rdfGen = new GenericRDFGenerator(null);
 	private static Logger logger = LoggerFactory.getLogger(TestJSONRDFGenerator.class);
 	
 	protected void executeBasicJSONTest(String filename, String modelName, boolean generateProvenance, int expectedNumberOfLines) throws IOException, URISyntaxException,
 			KarmaException {
-		logger.info("Loading json file: " + filename);
+		logger.debug("Loading json file: " + filename);
 		StringWriter sw = new StringWriter();
 		PrintWriter pw = new PrintWriter(sw);
 		List<KR2RMLRDFWriter> writers = this.createBasicWriter(pw);
@@ -60,6 +61,7 @@ public abstract class TestJSONRDFGenerator extends TestRdfGenerator{
 		request.setAddProvenance(generateProvenance);
 		request.setDataType(InputType.JSON);
 		request.addWriters(writers);
+		request.setContextParameters(ContextParametersRegistry.getInstance().getDefault());
 		rdfGen.generateRDF(request);
 		String rdf = sw.toString();
 		assertNotEquals(rdf.length(), 0);

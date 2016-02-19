@@ -73,9 +73,14 @@ public abstract class Command extends Entity implements ICommand
 	private List<CommandTag> tags = new ArrayList<CommandTag>();
 
 	private String inputParameterJson;
-
-	protected Command(String id) {
+	
+	private boolean isExecutedInBatch = false;
+	protected String model;
+	public static final String NEW_MODEL = "new";
+	
+	protected Command(String id, String model) {
 		super(id);
+		this.model = model;
 	}
 
 	@Override
@@ -88,6 +93,14 @@ public abstract class Command extends Entity implements ICommand
 		this.isExecuted = isExecuted;
 	}
 
+	public boolean isExecutedInBatch() {
+		return isExecutedInBatch;
+	}
+
+	public void setExecutedInBatch(boolean isExecuted) {
+		this.isExecutedInBatch = isExecuted;
+	}
+	
 	@Override
 	public boolean isSavedInHistory() {
 		return saveInHistory;
@@ -167,6 +180,10 @@ public abstract class Command extends Entity implements ICommand
 		this.appendToHistory = appendToHistory;
 	}
 
+	@Override
+	public String getModel() {
+		return model;
+	}
 	// /////////////////////////////////////////////////////////////////////////////
 	//
 	// Methods to help with logging and error reporting.

@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.isi.karma.config.ModelingConfiguration;
+import edu.isi.karma.config.ModelingConfigurationRegistry;
 import edu.isi.karma.modeling.ModelingParams;
 import edu.isi.karma.modeling.Namespaces;
 import edu.isi.karma.modeling.Prefixes;
@@ -57,6 +58,8 @@ import edu.isi.karma.rep.alignment.ObjectPropertyLink;
 import edu.isi.karma.rep.alignment.ObjectPropertyType;
 import edu.isi.karma.rep.alignment.SubClassLink;
 import edu.isi.karma.util.EncodingDetector;
+import edu.isi.karma.webserver.ContextParametersRegistry;
+import edu.isi.karma.webserver.ServletContextParameterMap;
 
 public class GraphBuilder {
 
@@ -91,18 +94,17 @@ public class GraphBuilder {
 	private HashMap<String, Integer> linkCountMap;
 	private HashMap<String, Integer> nodeDataPropertyCount; // nodeId + dataPropertyUri --> count
 	private HashMap<String, Set<Node>> nodeDataProperties; // nodeId + dataPropertyUri --> ColumnNode
+	private HashMap<String, Set<LabeledLink>> nodeIncomingLinks;
+	private HashMap<String, Set<LabeledLink>> nodeOutgoingLinks;
 	private HashMap<String, Set<SemanticTypeMapping>> semanticTypeMatches; // nodeUri + dataPropertyUri --> SemanticType Mapping
 	private int numberOfModelLinks = 0;
 
-	private HashMap<Node, Node> node2Domain;
-
-	
 	// Constructor
 	
-	public GraphBuilder(OntologyManager ontologyManager, NodeIdFactory nodeIdFactory, boolean addThingNode) { 
+	public GraphBuilder(OntologyManager ontologyManager, boolean addThingNode) { 
 		
 		this.ontologyManager = ontologyManager;
-		this.nodeIdFactory = nodeIdFactory;
+		this.nodeIdFactory = new NodeIdFactory();
 
 		this.idToNodeMap = new HashMap<String, Node>();
 		this.idToLinkMap = new HashMap<String, LabeledLink>();
@@ -124,7 +126,9 @@ public class GraphBuilder {
 		this.semanticTypeMatches = new HashMap<String, Set<SemanticTypeMapping>>();
 		
 		this.nodeDataProperties= new HashMap<String,Set<Node>>(); 
-		this.node2Domain = new HashMap<Node,Node>();
+		
+		this.nodeIncomingLinks = new HashMap<String, Set<LabeledLink>>();
+		this.nodeOutgoingLinks = new HashMap<String, Set<LabeledLink>>();
 		
 		this.forcedNodes = new HashSet<Node>();
 		if (addThingNode) 
@@ -132,9 +136,9 @@ public class GraphBuilder {
 		
 	}
 	
-	public GraphBuilder(OntologyManager ontologyManager, DirectedWeightedMultigraph<Node, DefaultLink> graph) {
+	public GraphBuilder(OntologyManager ontologyManager, DirectedWeightedMultigraph<Node, DefaultLink> graph, boolean useOriginalWeights) {
 		
-		this(ontologyManager, new NodeIdFactory(), false);
+		this(ontologyManager, false);
 		if (graph == null)
 			return;
 		
@@ -155,9 +159,11 @@ public class GraphBuilder {
 			source = link.getSource();
 			target = link.getTarget();
 			
-			double w = link.getWeight();
-			if (this.addLink(source, target, link))
-				changeLinkWeight(link, w);
+			DefaultLink l = link.getCopy(link.getId());
+			if (useOriginalWeights)
+				this.addLink(source, target, l, link.getWeight());
+			else
+				this.addLink(source, target, l);
 		}
 		
 		logger.debug("graph has been loaded.");
@@ -226,15 +232,19 @@ public class GraphBuilder {
 	public int getNumberOfModelLinks() {
 		return numberOfModelLinks;
 	}
-	
-	public HashMap<Node, Node> getNode2Domain() {
-		return node2Domain;
-	}
 
 	public HashMap<String, Set<Node>> getNodeDataProperties() {
 		return nodeDataProperties;
 	}
 
+	public final HashMap<String, Set<LabeledLink>> getIncomingLinksMap() {
+		return nodeIncomingLinks;
+	}
+	
+	public final HashMap<String, Set<LabeledLink>> getOutgoingLinksMap() {
+		return nodeOutgoingLinks;
+	}
+	
 	public void resetOntologyMaps() {
 		String[] currentUris = this.uriClosure.keySet().toArray(new String[0]);
 		this.uriClosure.clear();
@@ -243,29 +253,50 @@ public class GraphBuilder {
 	}
 
 	public boolean addNodeAndUpdate(Node node) {
-		if (ModelingConfiguration.getManualAlignment()) {
-			return addNode(node);
-		} else
-		return addNodeAndUpdate(node, null);
+		return this.addNodeAndUpdate(node, null);
 	}
-
+	
 	public boolean addNodeAndUpdate(Node node, Set<Node> addedNodes) {
-		
-		logger.debug("<enter");
-		if (addedNodes == null) addedNodes = new HashSet<Node>();
+		ModelingConfiguration modelingConfiguration = ModelingConfigurationRegistry.getInstance().getModelingConfiguration(ContextParametersRegistry.getInstance().getContextParameters(ontologyManager.getContextId()).getKarmaHome());
+		boolean result = addNode(node);
+		if (!result) 
+			return result;
 
-		if (!addNode(node))
-			return false;
-			
+		if (!modelingConfiguration.getOntologyAlignment()) 
+			return result;
+
+		if (addedNodes == null) 
+			addedNodes = new HashSet<Node>();
+		addedNodes.add(node);
+		if (node instanceof InternalNode) 
+			addClosureAndUpdateLinks((InternalNode)node, addedNodes);
+		
+		return result;
+	}
+	
+	public InternalNode copyNodeAndUpdate(Node node, boolean copyLinksToColumnNodes) {
+		InternalNode copyNode = null;
+		if (node instanceof InternalNode) {
+			copyNode = this.copyNode((InternalNode)node, copyLinksToColumnNodes);
+		} else {
+			logger.error("only can copy an internal node");
+			return null;
+		}
+		return copyNode;
+	}
+	
+	private void addClosureAndUpdateLinks(InternalNode node, Set<Node> addedNodes) {
+		
+		ModelingConfiguration modelingConfiguration = ModelingConfigurationRegistry.getInstance().getModelingConfiguration(ContextParametersRegistry.getInstance().getContextParameters(ontologyManager.getContextId()).getKarmaHome());
+		if (addedNodes == null) addedNodes = new HashSet<Node>();
 		if (node instanceof InternalNode) {
 
 			long start = System.currentTimeMillis();
 			float elapsedTimeSec;
 
-			
 			addedNodes.add(node);
 			
-			if (ModelingConfiguration.getNodeClosure()) {
+			if (modelingConfiguration.getNodeClosure()) {
 				addNodeClosure(node, addedNodes);
 			}
 			
@@ -292,12 +323,41 @@ public class GraphBuilder {
 
 			logger.debug("total number of nodes in graph: " + this.graph.vertexSet().size());
 			logger.debug("total number of links in graph: " + this.graph.edgeSet().size());
-		}
 
-		logger.debug("exit>");		
-		return true;
+		}
+		
 	}
 	
+	public void addClosureAndUpdateLinks(Set<InternalNode> internalNodes, Set<Node> addedNodes) {
+		
+		logger.debug("<enter");
+		if (addedNodes == null) addedNodes = new HashSet<Node>();
+
+		long start = System.currentTimeMillis();
+		float elapsedTimeSec;
+
+		if (internalNodes != null) {
+			Node[] nodes = internalNodes.toArray(new Node[0]);
+			for (Node node : nodes)
+				if (this.idToNodeMap.containsKey(node.getId()))
+					addNodeClosure(node, addedNodes);
+		}
+
+		long addNodesClosure = System.currentTimeMillis();
+		elapsedTimeSec = (addNodesClosure - start)/1000F;
+		logger.debug("time to add nodes closure: " + elapsedTimeSec);
+
+		updateLinks();
+		
+		long updateLinks = System.currentTimeMillis();
+		elapsedTimeSec = (updateLinks - addNodesClosure)/1000F;
+		logger.debug("time to update links of the graph: " + elapsedTimeSec);
+		
+		logger.debug("total number of nodes in graph: " + this.graph.vertexSet().size());
+		logger.debug("total number of links in graph: " + this.graph.edgeSet().size());
+
+		logger.debug("exit>");		
+	}
 	
 	public boolean addNode(Node node) {
 		
@@ -309,7 +369,7 @@ public class GraphBuilder {
 		}
 		
 		if (idToNodeMap.get(node.getId()) != null) {
-			logger.error("The node with id=" + node.getId() + " already exists in the graph.");
+			logger.debug("The node with id=" + node.getId() + " already exists in the graph.");
 			return false;
 		}
 		
@@ -317,7 +377,7 @@ public class GraphBuilder {
 			String uri = node.getUri();
 			Label label = this.ontologyManager.getUriLabel(uri);
 			if (label == null) {
-				logger.error("The resource " + uri + " does not exist in the ontology.");
+				logger.debug("The resource " + uri + " does not exist in the ontology.");
 				return false;
 			}
 			node.getLabel().setNs(label.getNs());
@@ -354,10 +414,59 @@ public class GraphBuilder {
 		return true;
 	}
 	
+	public InternalNode copyNode(InternalNode node, boolean copyLinksToColumnNodes) {
+		
+		if (node == null) {
+			logger.error("input node is null");
+			return null;
+		}
+		
+		String id = this.nodeIdFactory.getNodeId(node.getUri());
+		InternalNode newNode = new InternalNode(id, node.getLabel());
+		
+		if (!this.addNode(newNode)) {
+			logger.error("could not add the new node " + newNode.getId());
+			return null;
+		}
+		
+		Node source , target;
+		String newId;
+		Set<DefaultLink> incomingLinks = this.getGraph().incomingEdgesOf(node);
+		if (incomingLinks != null) {
+			for (DefaultLink l : incomingLinks) {
+				source = l.getSource();
+				if (source instanceof ColumnNode) continue;
+				target = newNode;
+				newId = LinkIdFactory.getLinkId(l.getUri(), source.getId(), target.getId());
+				DefaultLink copyLink = l.getCopy(newId);
+				this.addLink(source, target, copyLink, l.getWeight());
+			}
+		}
+		
+		Set<DefaultLink> outgoingLinks = this.getGraph().outgoingEdgesOf(node);
+		if (outgoingLinks != null) {
+			for (DefaultLink l : outgoingLinks) {
+				source = newNode;
+				target = l.getTarget();
+				if (!copyLinksToColumnNodes && target instanceof ColumnNode) continue; // skip links to column nodes
+				newId = LinkIdFactory.getLinkId(l.getUri(), source.getId(), target.getId());
+				DefaultLink copyLink = l.getCopy(newId);
+				this.addLink(source, target, copyLink, l.getWeight());
+			}
+		}
+		
+		return newNode;
+
+	}
+	
 	public Set<Node> getForcedNodes() {
 		return this.forcedNodes;
 	}
 
+	protected boolean sourceIsConnectedToTarget(Node source, Node target) {
+		return this.visitedSourceTargetPairs.contains(source.getId() + target.getId());
+	}
+	
 	public boolean addLink(Node source, Node target, DefaultLink link, Double weight) {
 		if (addLink(source, target, link)) {
 			if (weight != null) changeLinkWeight(link, weight);
@@ -376,17 +485,17 @@ public class GraphBuilder {
 		}
 		
 		if (this.idToLinkMap.containsKey(link.getId())) {
-			logger.warn("The link with id=" + link.getId() + " already exists in the graph");
+			logger.debug("The link with id=" + link.getId() + " already exists in the graph");
 			return false;
 		}
 		
 		if (!this.idToNodeMap.containsKey(source.getId())) {
-			logger.error("The link source " + link.getSource().getId() + " does not exist in the graph");
+			logger.debug("The link source " + source.getId() + " does not exist in the graph");
 			return false;
 		}
 
 		if (!this.idToNodeMap.containsKey(target.getId())) {
-			logger.error("The link target " + link.getTarget().getId() + " does not exist in the graph");
+			logger.debug("The link target " + target.getId() + " does not exist in the graph");
 			return false;
 		}
 
@@ -394,7 +503,7 @@ public class GraphBuilder {
 			String uri = link.getUri();
 			Label label = this.ontologyManager.getUriLabel(uri);
 			if (label == null) {
-				logger.error("The resource " + uri + " does not exist in the ontology.");
+				logger.debug("The resource " + uri + " does not exist in the ontology.");
 				return false;
 			}
 			((LabeledLink)link).getLabel().setNs(label.getNs());
@@ -443,10 +552,19 @@ public class GraphBuilder {
 			}
 		}
 
+		Set<LabeledLink> inLinks = nodeIncomingLinks.get(target.getId());
+		if(inLinks == null) inLinks = new HashSet<>();
+		inLinks.add(labeledLink);
+		nodeIncomingLinks.put(target.getId(), inLinks);
+		
+		Set<LabeledLink> outLinks = nodeOutgoingLinks.get(source.getId());
+		if(outLinks == null) outLinks = new HashSet<>();
+		outLinks.add(labeledLink);
+		nodeOutgoingLinks.put(source.getId(), outLinks);
+		
+		
 		if (source instanceof InternalNode && target instanceof ColumnNode) {
-			
-			this.node2Domain.put(target, source);
-			
+
 			String key = source.getId() + link.getUri();
 			Integer count = this.nodeDataPropertyCount.get(key);
 			if (count == null) this.nodeDataPropertyCount.put(key, 1);
@@ -481,9 +599,24 @@ public class GraphBuilder {
 	
 	private double computeWeight(DefaultLink link) {
 		double w = 0.0;
+		
+		if (link instanceof LabeledLink && ((LabeledLink)link).getStatus() == LinkStatus.PreferredByUI)
+			w = ModelingParams.PROPERTY_UI_PREFERRED_WEIGHT;
+		
+		if (link instanceof LabeledLink && 
+				((LabeledLink)link).getModelIds() != null &&
+				!((LabeledLink)link).getModelIds().isEmpty()) 
+			w = ModelingParams.PATTERN_LINK_WEIGHT;
+
+		if (link instanceof LabeledLink && ((LabeledLink)link).getStatus() == LinkStatus.ForcedByUser)
+			w = ModelingParams.PROPERTY_USER_PREFERRED_WEIGHT;
+		
+		if (w != 0.0)
+			return w;
+		
 		if (link instanceof ObjectPropertyLink && ((ObjectPropertyLink)link).getObjectPropertyType() == ObjectPropertyType.Direct)
 			w = ModelingParams.PROPERTY_DIRECT_WEIGHT;
-		if (link instanceof CompactObjectPropertyLink && ((CompactObjectPropertyLink)link).getObjectPropertyType() == ObjectPropertyType.Direct)
+		else if (link instanceof CompactObjectPropertyLink && ((CompactObjectPropertyLink)link).getObjectPropertyType() == ObjectPropertyType.Direct)
 			w = ModelingParams.PROPERTY_DIRECT_WEIGHT;
 		else if (link instanceof ObjectPropertyLink && ((ObjectPropertyLink)link).getObjectPropertyType() == ObjectPropertyType.Indirect)
 			w = ModelingParams.PROPERTY_INDIRECT_WEIGHT;
@@ -505,21 +638,28 @@ public class GraphBuilder {
 			w = ModelingParams.SUBCLASS_WEIGHT;
 		else if (link instanceof CompactSubClassLink)
 			w = ModelingParams.SUBCLASS_WEIGHT;
-		else
+		else 
 			w = ModelingParams.PROPERTY_DIRECT_WEIGHT;
+		
 		return w;
 	}
 	
 	public void changeLinkStatus(LabeledLink link, LinkStatus newStatus) {
 
-		LinkStatus oldStatus = link.getStatus();
+		if (link == null) return;
+		LabeledLink graphLink = this.getIdToLinkMap().get(link.getId()); // use the graph link, not the tree link sent by the alignment (steiner tree has a copy of the graph link)
+		if (graphLink == null) return;
+		
+		LinkStatus oldStatus = graphLink.getStatus();
 		if (newStatus == oldStatus)
 			return;
 		
+		graphLink.setStatus(newStatus);
 		link.setStatus(newStatus);
+		this.changeLinkWeight(graphLink, computeWeight(graphLink));
 		
 		Set<LabeledLink> linksWithOldStatus = this.statusToLinksMap.get(oldStatus);
-		if (linksWithOldStatus != null) linksWithOldStatus.remove(link);
+		if (linksWithOldStatus != null) linksWithOldStatus.remove(graphLink);
 
 		if (newStatus == LinkStatus.Normal) // we don't need to index normal links 
 			return;
@@ -529,7 +669,7 @@ public class GraphBuilder {
 			linksWithNewStatus = new HashSet<LabeledLink>();
 			statusToLinksMap.put(newStatus, linksWithNewStatus);
 		}
-		linksWithNewStatus.add(link);
+		linksWithNewStatus.add(graphLink);
 	}
 	
 	public void changeLinkWeight(DefaultLink link, double weight) {
@@ -572,6 +712,16 @@ public class GraphBuilder {
 			Set<LabeledLink> linksWithSameStatus = statusToLinksMap.get(((LabeledLink)link).getStatus());
 			if (linksWithSameStatus != null) 
 				linksWithSameStatus.remove(link);
+			
+			Node source = link.getSource();
+			Set<LabeledLink> sourceLinks = nodeOutgoingLinks.get(source.getId());
+			if(sourceLinks != null)
+				sourceLinks.remove(link);
+			
+			Node target = link.getTarget();
+			Set<LabeledLink> targetLinks = nodeIncomingLinks.get(target.getId());
+			if(targetLinks != null)
+				targetLinks.remove(link);
 		}
 		
 		return true;
@@ -630,39 +780,7 @@ public class GraphBuilder {
 		
 		return true;
 	}
-
-	public void addClosureAndLinksOfNodes(Set<InternalNode> internalNodes, Set<Node> addedNodes) {
-		
-		logger.debug("<enter");
-		if (addedNodes == null) addedNodes = new HashSet<Node>();
-
-		long start = System.currentTimeMillis();
-		float elapsedTimeSec;
-
-		if (internalNodes != null) {
-			Node[] nodes = internalNodes.toArray(new Node[0]);
-			for (Node node : nodes)
-				if (this.idToNodeMap.containsKey(node.getId()))
-					addNodeClosure(node, addedNodes);
-		}
-
-		long addNodesClosure = System.currentTimeMillis();
-		elapsedTimeSec = (addNodesClosure - start)/1000F;
-		logger.debug("time to add nodes closure: " + elapsedTimeSec);
-
-		updateLinks();
-		
-		long updateLinks = System.currentTimeMillis();
-		elapsedTimeSec = (updateLinks - addNodesClosure)/1000F;
-		logger.debug("time to update links of the graph: " + elapsedTimeSec);
-		
-		logger.debug("total number of nodes in graph: " + this.graph.vertexSet().size());
-		logger.debug("total number of links in graph: " + this.graph.edgeSet().size());
-
-		logger.debug("exit>");		
-	}
 	
-
 	public LinkFrequency getMoreFrequentLinkBetweenNodes(String sourceUri, String targetUri) {
 
 		List<String> possibleLinksFromSourceToTarget = new ArrayList<String>();
@@ -808,15 +926,13 @@ public class GraphBuilder {
 		return lf;
 		
 	}
-	
-	// Private Methods
-	
+		
 	private void initialGraph() {
 		
 		logger.debug("<enter");
-		
+		ModelingConfiguration modelingConfiguration = ModelingConfigurationRegistry.getInstance().getModelingConfiguration(ContextParametersRegistry.getInstance().getContextParameters(ontologyManager.getContextId()).getKarmaHome());
 		// Add Thing to the Graph 
-		if (ModelingConfiguration.getThingNode()) {
+		if (modelingConfiguration.getThingNode()) {
 			String id = nodeIdFactory.getNodeId(Uris.THING_URI);
 			Label label = new Label(Uris.THING_URI, Namespaces.OWL, Prefixes.OWL);
 			Node thing = new InternalNode(id, label);
@@ -1012,6 +1128,8 @@ public class GraphBuilder {
 		
 		logger.debug("<enter");
 		
+		ModelingConfiguration modelingConfiguration = ModelingConfigurationRegistry.getInstance().getModelingConfiguration(ContextParametersRegistry.getInstance().getContextParameters(ontologyManager.getContextId()).getKarmaHome());
+		
 		Set<Node> nodeSet = this.typeToNodesMap.get(NodeType.InternalNode);
 		if (nodeSet == null || nodeSet.isEmpty())
 			return;
@@ -1024,7 +1142,7 @@ public class GraphBuilder {
 		String sourceUri;
 		String targetUri;
 
-		String id = null;
+		String id1 = null, id2 = null;
 		
 		for (int i = 0; i < nodes.size(); i++) {
 			
@@ -1047,73 +1165,108 @@ public class GraphBuilder {
 				sourceUri = source.getUri();
 				targetUri = target.getUri();
 
-				id = LinkIdFactory.getLinkId(Uris.DEFAULT_LINK_URI, source.getId(), target.getId());
+				id1 = LinkIdFactory.getLinkId(Uris.DEFAULT_LINK_URI, source.getId(), target.getId());
+				id2 = LinkIdFactory.getLinkId(Uris.DEFAULT_LINK_URI, target.getId(), source.getId());
 				CompactLink link = null; 
 
-				boolean connected = false;
+//				boolean connected = false;
+				boolean sourceConnectedToTarget = false;
+				boolean targetConnectedToSource = false;
 				
 				// order of adding the links is based on the ascending sort of their weight value
 				
-				if (ModelingConfiguration.getPropertiesDirect()) {
-					if (this.ontologyManager.isConnectedByDirectProperty(sourceUri, targetUri) ||
-							this.ontologyManager.isConnectedByDirectProperty(targetUri, sourceUri)) {
+
+				if (modelingConfiguration.getPropertiesDirect()) {
+					if (this.ontologyManager.isConnectedByDirectProperty(sourceUri, targetUri)) {
 						logger.debug( sourceUri + " and " + targetUri + " are connected by a direct object property.");
-						link = new CompactObjectPropertyLink(id, ObjectPropertyType.Direct);
+						link = new CompactObjectPropertyLink(id1, ObjectPropertyType.Direct);
 						addLink(source, target, link);
-						connected = true;
+						sourceConnectedToTarget = true;
 					}
+					if (this.ontologyManager.isConnectedByDirectProperty(targetUri, sourceUri)) {
+						logger.debug( targetUri + " and " + sourceUri + " are connected by a direct object property.");
+						link = new CompactObjectPropertyLink(id2, ObjectPropertyType.Direct);
+						addLink(target, source, link);
+						targetConnectedToSource = true;
+					}				
 				}
 				
-				if (ModelingConfiguration.getPropertiesIndirect() && !connected) {
-					if (this.ontologyManager.isConnectedByIndirectProperty(sourceUri, targetUri) ||
-							this.ontologyManager.isConnectedByIndirectProperty(targetUri, sourceUri)) { 
+
+				if (modelingConfiguration.getPropertiesIndirect()) {
+					if (!sourceConnectedToTarget && this.ontologyManager.isConnectedByIndirectProperty(sourceUri, targetUri)) { 
 						logger.debug( sourceUri + " and " + targetUri + " are connected by an indirect object property.");
-						link = new CompactObjectPropertyLink(id, ObjectPropertyType.Indirect);
+						link = new CompactObjectPropertyLink(id1, ObjectPropertyType.Indirect);
 						addLink(source, target, link);
-						connected = true;
+						sourceConnectedToTarget = true;
+					}
+					if (!targetConnectedToSource && this.ontologyManager.isConnectedByIndirectProperty(targetUri, sourceUri)) { 
+						logger.debug( targetUri + " and " + sourceUri + " are connected by an indirect object property.");
+						link = new CompactObjectPropertyLink(id2, ObjectPropertyType.Indirect);
+						addLink(target, source, link);
+						targetConnectedToSource = true;
 					}
 				}
 				
-				if (ModelingConfiguration.getPropertiesWithOnlyRange() && !connected) {
-					if (this.ontologyManager.isConnectedByDomainlessProperty(sourceUri, targetUri) ||
-							this.ontologyManager.isConnectedByDomainlessProperty(targetUri, sourceUri)) { 
+
+				if (modelingConfiguration.getPropertiesWithOnlyRange()) {
+					if (!sourceConnectedToTarget && this.ontologyManager.isConnectedByDomainlessProperty(sourceUri, targetUri)) { 
 						logger.debug( sourceUri + " and " + targetUri + " are connected by an object property whose range is " + sourceUri + " or " + targetUri);
-						link = new CompactObjectPropertyLink(id, ObjectPropertyType.WithOnlyRange);
+						link = new CompactObjectPropertyLink(id1, ObjectPropertyType.WithOnlyRange);
 						addLink(source, target, link);
-						connected = true;
+						sourceConnectedToTarget = true;
+					}
+
+					if (!targetConnectedToSource && this.ontologyManager.isConnectedByDomainlessProperty(targetUri, sourceUri)) { 
+						logger.debug( targetUri + " and " + sourceUri + " are connected by an object property whose range is " + targetUri + " or " + sourceUri);
+						link = new CompactObjectPropertyLink(id2, ObjectPropertyType.WithOnlyRange);
+						addLink(target, source, link);
+						targetConnectedToSource = true;
 					}
 				}
 				
-				if (ModelingConfiguration.getPropertiesWithOnlyDomain() && !connected) {
-					if (this.ontologyManager.isConnectedByRangelessProperty(sourceUri, targetUri) ||
-							this.ontologyManager.isConnectedByRangelessProperty(targetUri, sourceUri)) { 
+				if (modelingConfiguration.getPropertiesWithOnlyDomain()) {
+					if (!sourceConnectedToTarget && this.ontologyManager.isConnectedByRangelessProperty(sourceUri, targetUri)) { 
 						logger.debug( sourceUri + " and " + targetUri + " are connected by an object property whose domain is " + sourceUri + " or " + targetUri);
-						link = new CompactObjectPropertyLink(id, ObjectPropertyType.WithOnlyDomain);
-						addLink(source, target, link);	
-						connected = true;
-					}
-				}
-				
-				if (ModelingConfiguration.getPropertiesSubClass() && !connected) {
-					if (this.ontologyManager.isSubClass(sourceUri, targetUri, false) ||
-							this.ontologyManager.isSubClass(targetUri, sourceUri, false)) {
-						logger.debug( sourceUri + " and " + targetUri + " are connected by a subClassOf relation.");
-						link = new CompactSubClassLink(id);
+						link = new CompactObjectPropertyLink(id1, ObjectPropertyType.WithOnlyDomain);
 						addLink(source, target, link);
-						connected = true;
+						sourceConnectedToTarget = true;
+					}
+					if (!targetConnectedToSource && this.ontologyManager.isConnectedByRangelessProperty(targetUri, sourceUri)) { 
+						logger.debug( targetUri + " and " + sourceUri + " are connected by an object property whose domain is " + targetUri + " or " + sourceUri);
+						link = new CompactObjectPropertyLink(id2, ObjectPropertyType.WithOnlyDomain);
+						addLink(target, source, link);
+						targetConnectedToSource = true;
 					}
 				}
 				
-				if (ModelingConfiguration.getPropertiesWithoutDomainRange() && !connected) {
+				if (modelingConfiguration.getPropertiesWithoutDomainRange() && !sourceConnectedToTarget && !targetConnectedToSource) {
 					if (this.ontologyManager.isConnectedByDomainlessAndRangelessProperty(sourceUri, targetUri)) {// ||
 	//						this.ontologyManager.isConnectedByDomainlessAndRangelessProperty(targetUri, sourceUri)) { 
-						link = new CompactObjectPropertyLink(id, ObjectPropertyType.WithoutDomainAndRange);
+						link = new CompactObjectPropertyLink(id1, ObjectPropertyType.WithoutDomainAndRange);
 						addLink(source, target, link);
-						connected = true;
+						link = new CompactObjectPropertyLink(id2, ObjectPropertyType.WithoutDomainAndRange);
+						addLink(target, source, link);
+						sourceConnectedToTarget = true;
+						targetConnectedToSource = true;
 					}
 				}
 
-				if (!connected) {
+				if (!sourceConnectedToTarget && modelingConfiguration.getPropertiesSubClass()) {
+					if (this.ontologyManager.isSubClass(sourceUri, targetUri, false)) {
+						logger.debug( sourceUri + " and " + targetUri + " are connected by a subClassOf relation.");
+						link = new CompactSubClassLink(id1);
+						addLink(source, target, link);
+						sourceConnectedToTarget = true;
+					}
+					if (!targetConnectedToSource && this.ontologyManager.isSubClass(targetUri, sourceUri, false)) {
+						logger.debug( targetUri + " and " + sourceUri + " are connected by a subClassOf relation.");
+						link = new CompactSubClassLink(id2);
+						addLink(target, source, link);
+						targetConnectedToSource = true;
+					}
+				}
+				
+				if (!sourceConnectedToTarget && !targetConnectedToSource) {
 					this.visitedSourceTargetPairs.add(n1.getId() + n2.getId());
 					logger.debug("did not put a link between (" + n1.getId() + ", " + n2.getId() + ")");
 				}
@@ -1123,7 +1276,6 @@ public class GraphBuilder {
 		logger.debug("exit>");
 	}
 	
-
 	public List<LabeledLink> getPossibleLinks(String sourceId, String targetId) {
 		return getPossibleLinks(sourceId, targetId, null, null);
 	}
@@ -1191,13 +1343,15 @@ public class GraphBuilder {
 	
 	public static void main(String[] args) throws Exception {
 		
+		ServletContextParameterMap contextParameters = ContextParametersRegistry.getInstance().getDefault();
+		
 		logger.info(Integer.class.getFields()[0].getName());
 		
 		/** Check if any ontology needs to be preloaded **/
 		File ontDir = new File(Params.ONTOLOGY_DIR);
 		if (ontDir.exists()) {
 			File[] ontologies = ontDir.listFiles();
-			OntologyManager mgr = new OntologyManager();
+			OntologyManager mgr = new OntologyManager(contextParameters.getId());
 			for (File ontology: ontologies) {
 				System.out.println(ontology.getName());
 				if (ontology.getName().endsWith(".owl") || 

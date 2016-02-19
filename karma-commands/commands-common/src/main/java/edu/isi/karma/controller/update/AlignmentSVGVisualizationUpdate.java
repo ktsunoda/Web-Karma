@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import edu.isi.karma.config.UIConfiguration;
+import edu.isi.karma.config.UIConfigurationRegistry;
 import edu.isi.karma.modeling.alignment.Alignment;
 import edu.isi.karma.modeling.alignment.AlignmentManager;
 import edu.isi.karma.modeling.alignment.LinkIdFactory;
@@ -42,6 +43,7 @@ import edu.isi.karma.rep.ColumnMetadata;
 import edu.isi.karma.rep.HNode;
 import edu.isi.karma.rep.HTable;
 import edu.isi.karma.rep.Worksheet;
+import edu.isi.karma.rep.Workspace;
 import edu.isi.karma.rep.alignment.ColumnNode;
 import edu.isi.karma.rep.alignment.DataPropertyOfColumnLink;
 import edu.isi.karma.rep.alignment.DisplayModel;
@@ -57,8 +59,8 @@ import edu.isi.karma.view.VWorkspace;
 
 public class AlignmentSVGVisualizationUpdate extends AbstractUpdate {
 	private final String worksheetId;
-	private final DirectedWeightedMultigraph<Node, LabeledLink> alignmentGraph;
-	private final Alignment alignment;
+	private DirectedWeightedMultigraph<Node, LabeledLink> alignmentGraph;
+	private Alignment alignment;
 	private static Logger logger = LoggerFactory
 			.getLogger(AlignmentSVGVisualizationUpdate.class);
 
@@ -73,12 +75,10 @@ public class AlignmentSVGVisualizationUpdate extends AbstractUpdate {
 		key, holderLink, objPropertyLink, Unassigned, FakeRoot, FakeRootLink, Add_Parent, DataPropertyOfColumnHolder, horizontalDataPropertyLink
 	}
 
-	public AlignmentSVGVisualizationUpdate(String worksheetId,
-			Alignment alignment) {
+	public AlignmentSVGVisualizationUpdate(String worksheetId) {
 		super();
 		this.worksheetId = worksheetId;
-		this.alignmentGraph = alignment.getSteinerTree();
-		this.alignment = alignment;
+		
 	}
 
 	private JSONObject getForceLayoutNodeJsonObject(int id, String label,
@@ -117,7 +117,11 @@ public class AlignmentSVGVisualizationUpdate extends AbstractUpdate {
 	@Override
 	public void generateJson(String prefix, PrintWriter pw,
 			VWorkspace vWorkspace) {
-		if (UIConfiguration.Instance().isForceModelLayoutEnabled())
+		Workspace workspace = vWorkspace.getWorkspace();
+		alignment = AlignmentManager.Instance().getAlignment(workspace.getId(), worksheetId);
+		this.alignmentGraph = alignment.getSteinerTree();
+		UIConfiguration uiConfiguration = UIConfigurationRegistry.getInstance().getUIConfiguration(vWorkspace.getWorkspace().getContextId());
+		if (uiConfiguration.isForceModelLayoutEnabled())
 			generateJsonForForceLayout(prefix, pw, vWorkspace);
 		else
 			generateJsonForNormalLayout(prefix, pw, vWorkspace);

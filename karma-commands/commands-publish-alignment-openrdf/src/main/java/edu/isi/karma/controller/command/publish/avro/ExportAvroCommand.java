@@ -12,6 +12,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import edu.isi.karma.common.OSUtils;
 import edu.isi.karma.controller.command.CommandException;
 import edu.isi.karma.controller.command.CommandType;
 import edu.isi.karma.controller.command.WorksheetSelectionCommand;
@@ -31,11 +32,10 @@ import edu.isi.karma.kr2rml.planning.WorksheetDepthRootStrategy;
 import edu.isi.karma.kr2rml.writer.AvroKR2RMLRDFWriter;
 import edu.isi.karma.modeling.alignment.Alignment;
 import edu.isi.karma.modeling.alignment.AlignmentManager;
-import edu.isi.karma.modeling.ontology.OntologyManager;
-import edu.isi.karma.rep.RepFactory;
 import edu.isi.karma.rep.Worksheet;
 import edu.isi.karma.rep.Workspace;
 import edu.isi.karma.view.VWorkspace;
+import edu.isi.karma.webserver.ContextParametersRegistry;
 import edu.isi.karma.webserver.KarmaException;
 import edu.isi.karma.webserver.ServletContextParameterMap;
 import edu.isi.karma.webserver.ServletContextParameterMap.ContextParameter;
@@ -53,9 +53,9 @@ public class ExportAvroCommand extends WorksheetSelectionCommand {
     
 	
 	//TODO provde option to output pretty printed avro json
-	public ExportAvroCommand(String id, String alignmentNodeId, 
+	public ExportAvroCommand(String id, String model, String alignmentNodeId, 
 			String worksheetId, String selectionId) {
-		super(id, worksheetId, selectionId);
+		super(id, model, worksheetId, selectionId);
 		this.alignmentNodeId = alignmentNodeId;
 		
 	}
@@ -84,14 +84,13 @@ public class ExportAvroCommand extends WorksheetSelectionCommand {
 	public UpdateContainer doIt(Workspace workspace) throws CommandException {
 		
 
-		
+		final ServletContextParameterMap contextParameters = ContextParametersRegistry.getInstance().getContextParameters(workspace.getContextId());
 		Worksheet worksheet = workspace.getWorksheet(worksheetId);
 		SuperSelection selection = getSuperSelection(worksheet);
-		RepFactory f = workspace.getFactory();
+		
 		Alignment alignment = AlignmentManager.Instance().getAlignment(
 				AlignmentManager.Instance().constructAlignmentId(workspace.getId(),
 						worksheetId));
-		OntologyManager ontMgr = workspace.getOntologyManager();
 		// Set the prefix and namespace to be used while generating RDF
 		fetchRdfPrefixAndNamespaceFromPreferences(workspace);
 		
@@ -134,7 +133,7 @@ public class ExportAvroCommand extends WorksheetSelectionCommand {
 		}
 		final String avroFileName = workspace.getCommandPreferencesId() + worksheetId + "-" + 
 				worksheet.getTitle().replaceAll("\\.", "_") +  "-export"+".avro"; 
-		final String avroFileLocalPath = ServletContextParameterMap.getParameterValue(ContextParameter.AVRO_PUBLISH_DIR) +  
+		final String avroFileLocalPath = contextParameters.getParameterValue(ContextParameter.AVRO_PUBLISH_DIR) +  
 				avroFileName;
 		
 		try {
@@ -142,7 +141,7 @@ public class ExportAvroCommand extends WorksheetSelectionCommand {
 			AvroKR2RMLRDFWriter writer = new AvroKR2RMLRDFWriter(fos);
 			writer.addPrefixes(mapping.getPrefixes());
 			RootStrategy strategy = new UserSpecifiedRootStrategy(rootTriplesMapId, new SteinerTreeRootStrategy(new WorksheetDepthRootStrategy()));
-			KR2RMLWorksheetRDFGenerator generator = new KR2RMLWorksheetRDFGenerator(worksheet, f, ontMgr, writer, 
+			KR2RMLWorksheetRDFGenerator generator = new KR2RMLWorksheetRDFGenerator(worksheet, workspace, writer, 
 					false, strategy, mapping, errorReport, selection);
 			try {
 				generator.generateRDF(true);
@@ -153,6 +152,9 @@ public class ExportAvroCommand extends WorksheetSelectionCommand {
 			}
 			fos.flush();
 			fos.close();
+			if(OSUtils.isWindows())
+				System.gc();  //Invoke gc for windows, else it gives error: The requested operation cannot be performed on a file with a user-mapped section open
+			//when the model is republished, and the original model is earlier open
 		} catch (FileNotFoundException e) {
 			logger.error("File Not found", e);
 			return new UpdateContainer(new ErrorUpdate("File Not found while generating RDF: " + e.getMessage()));
@@ -170,7 +172,7 @@ public class ExportAvroCommand extends WorksheetSelectionCommand {
 					outputObject.put(JsonKeys.updateType.name(),
 							"PublishAvroUpdate");
 					outputObject.put(JsonKeys.fileUrl.name(), 
-							ServletContextParameterMap.getParameterValue(ContextParameter.AVRO_PUBLISH_RELATIVE_DIR) + avroFileName);
+							contextParameters.getParameterValue(ContextParameter.AVRO_PUBLISH_RELATIVE_DIR) + avroFileName);
 					outputObject.put(JsonKeys.worksheetId.name(),
 							worksheetId);
 					pw.println(outputObject.toString(4));

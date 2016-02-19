@@ -10,6 +10,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.ReaderInputStream;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 
+import edu.isi.karma.common.OSUtils;
 import edu.isi.karma.controller.command.CommandException;
 import edu.isi.karma.controller.command.CommandType;
 import edu.isi.karma.controller.command.WorksheetSelectionCommand;
@@ -41,12 +43,11 @@ import edu.isi.karma.kr2rml.planning.WorksheetDepthRootStrategy;
 import edu.isi.karma.kr2rml.writer.JSONKR2RMLRDFWriter;
 import edu.isi.karma.modeling.alignment.Alignment;
 import edu.isi.karma.modeling.alignment.AlignmentManager;
-import edu.isi.karma.modeling.ontology.OntologyManager;
-import edu.isi.karma.rep.RepFactory;
 import edu.isi.karma.rep.Worksheet;
 import edu.isi.karma.rep.Workspace;
 import edu.isi.karma.rep.metadata.WorksheetProperties.Property;
 import edu.isi.karma.view.VWorkspace;
+import edu.isi.karma.webserver.ContextParametersRegistry;
 import edu.isi.karma.webserver.KarmaException;
 import edu.isi.karma.webserver.ServletContextParameterMap;
 import edu.isi.karma.webserver.ServletContextParameterMap.ContextParameter;
@@ -59,18 +60,20 @@ public class ExportJSONCommand extends WorksheetSelectionCommand {
 	private String rdfNamespace;
 	private boolean contextFromModel;
 	private String contextJSON;
-
+	private String contextURL;
 	private enum JsonKeys {
 		updateType, fileUrl, worksheetId, contextUrl
 	}
 
-	public ExportJSONCommand(String id, String alignmentNodeId, 
+	public ExportJSONCommand(String id, String model, String alignmentNodeId, 
 			String worksheetId, String selectionId, 
-			boolean contextFromModel, String contextJSON) {
-		super(id, worksheetId, selectionId);
+			boolean contextFromModel, String contextJSON,
+			String contextURL) {
+		super(id, model, worksheetId, selectionId);
 		this.alignmentNodeId = alignmentNodeId;
 		this.contextFromModel = contextFromModel;
 		this.contextJSON = contextJSON;
+		this.contextURL = contextURL;
 	}
 
 	@Override
@@ -96,15 +99,15 @@ public class ExportJSONCommand extends WorksheetSelectionCommand {
 	@Override
 	public UpdateContainer doIt(Workspace workspace) throws CommandException {
 		logger.info("Entered ExportJSONCommand");
-
-
+		
+		final ServletContextParameterMap contextParameters = ContextParametersRegistry.getInstance().getContextParameters(workspace.getContextId());
 		Worksheet worksheet = workspace.getWorksheet(worksheetId);
 		SuperSelection selection = getSuperSelection(worksheet);
-		RepFactory f = workspace.getFactory();
+		
 		Alignment alignment = AlignmentManager.Instance().getAlignment(
 				AlignmentManager.Instance().constructAlignmentId(workspace.getId(),
 						worksheetId));
-		OntologyManager ontMgr = workspace.getOntologyManager();
+		workspace.getOntologyManager();
 		// Set the prefix and namespace to be used while generating RDF
 		fetchRdfPrefixAndNamespaceFromPreferences(workspace);
 
@@ -134,6 +137,10 @@ public class ExportJSONCommand extends WorksheetSelectionCommand {
 				writer.close();
 				pw.flush();
 				pw.close();
+				if(OSUtils.isWindows())
+					System.gc();  //Invoke gc for windows, else it gives error: The requested operation cannot be performed on a file with a user-mapped section open
+				//when the model is republished, and the original model is earlier open
+				
 				Model model = ModelFactory.createDefaultModel();
 				InputStream s = new ReaderInputStream(new StringReader(string.toString()));
 				model.read(s, null, "TURTLE");
@@ -169,15 +176,26 @@ public class ExportJSONCommand extends WorksheetSelectionCommand {
 		// create JSONKR2RMLRDFWriter
 		final String jsonFileName = workspace.getCommandPreferencesId() + worksheetId + "-" + 
 				worksheet.getTitle().replaceAll("\\.", "_") +  "-export"+".json"; 
-		final String jsonFileLocalPath = ServletContextParameterMap.getParameterValue(ContextParameter.JSON_PUBLISH_DIR) +  
+		final String jsonFileLocalPath = contextParameters.getParameterValue(ContextParameter.JSON_PUBLISH_DIR) +  
 				jsonFileName;
 		final String contextName = workspace.getCommandPreferencesId() + worksheetId + "-" + worksheet.getTitle().replaceAll("\\.", "_") +  "-context.json";
-		final String jsonContextFileLocalPath = ServletContextParameterMap.getParameterValue(ContextParameter.JSON_PUBLISH_DIR) + contextName;
+		final String jsonContextFileLocalPath = contextParameters.getParameterValue(ContextParameter.JSON_PUBLISH_DIR) + contextName;
 		PrintWriter printWriter;
 		try {
 			printWriter = new PrintWriter(jsonFileLocalPath);
 			String baseURI = worksheet.getMetadataContainer().getWorksheetProperties().getPropertyValue(Property.baseURI);
 			JSONKR2RMLRDFWriter writer = new JSONKR2RMLRDFWriter(printWriter, baseURI);
+			if((contextJSON == null || contextJSON.trim().isEmpty()) && contextURL != null && !contextURL.isEmpty())
+			{
+				try{
+					contextJSON = IOUtils.toString(new URL(contextURL).openStream());	
+				}
+				catch (Exception e)
+				{
+					logger.error("Unable to read context from URL", e);
+				}
+				
+			}
 			if (contextJSON != null && !contextJSON.isEmpty()) {
 				JSONObject context = new JSONObject();
 				try {
@@ -190,18 +208,22 @@ public class ExportJSONCommand extends WorksheetSelectionCommand {
 				PrintWriter pw = new PrintWriter(jsonContextFileLocalPath);
 				pw.println(context.toString(4));
 				pw.close();
-				StringBuilder url = new StringBuilder();
-				url.append(ServletContextParameterMap.getParameterValue(ContextParameter.JETTY_HOST));
-				url.append(":");
-				url.append(ServletContextParameterMap.getParameterValue(ContextParameter.JETTY_PORT));
-				url.append("/");
-				url.append(ServletContextParameterMap.getParameterValue(ContextParameter.JSON_PUBLISH_RELATIVE_DIR));
-				url.append(contextName);
-				writer.setGlobalContext(context, new ContextIdentifier(context.toString(), new URL(url.toString())));
+				if(contextURL == null || contextURL.trim().isEmpty())
+				{
+					StringBuilder url = new StringBuilder();
+					url.append(contextParameters.getParameterValue(ContextParameter.JETTY_HOST));
+					url.append(":");
+					url.append(contextParameters.getParameterValue(ContextParameter.JETTY_PORT));
+					url.append("/");
+					url.append(contextParameters.getParameterValue(ContextParameter.JSON_PUBLISH_RELATIVE_DIR));
+					url.append(contextName);
+					contextURL = url.toString();
+				}
+				writer.setGlobalContext(context, new ContextIdentifier(context.toString(), new URL(contextURL)));
 			}
 			writer.addPrefixes(mapping.getPrefixes());
 			RootStrategy strategy = new UserSpecifiedRootStrategy(rootTriplesMapId, new SteinerTreeRootStrategy(new WorksheetDepthRootStrategy()));
-			KR2RMLWorksheetRDFGenerator generator = new KR2RMLWorksheetRDFGenerator(worksheet, f, ontMgr, writer, false, strategy, mapping, errorReport, selection);
+			KR2RMLWorksheetRDFGenerator generator = new KR2RMLWorksheetRDFGenerator(worksheet, workspace, writer, false, strategy, mapping, errorReport, selection);
 			try {
 				generator.generateRDF(true);
 				logger.info("RDF written to file.");
@@ -215,12 +237,6 @@ public class ExportJSONCommand extends WorksheetSelectionCommand {
 			return new UpdateContainer(new ErrorUpdate("File Not found while generating RDF: " + e.getMessage()));
 		}
 
-		//	ExportMongoDBUtil mongo = new ExportMongoDBUtil();
-		try {
-			//	mongo.publishMongoDB(JSONArray);
-		} catch (Exception e) {
-			logger.error("Error inserting into MongoDB." + e.getMessage());
-		}		
 		return new UpdateContainer(new AbstractUpdate() {
 
 			@Override
@@ -230,10 +246,10 @@ public class ExportJSONCommand extends WorksheetSelectionCommand {
 					outputObject.put(JsonKeys.updateType.name(),
 							"PublishJSONUpdate");
 					outputObject.put(JsonKeys.fileUrl.name(), 
-							ServletContextParameterMap.getParameterValue(ContextParameter.JSON_PUBLISH_RELATIVE_DIR) + jsonFileName);
+							contextParameters.getParameterValue(ContextParameter.JSON_PUBLISH_RELATIVE_DIR) + jsonFileName);
 					if (contextJSON != null && !contextJSON.isEmpty()) {
 						outputObject.put(JsonKeys.contextUrl.name(), 
-								ServletContextParameterMap.getParameterValue(ContextParameter.JSON_PUBLISH_RELATIVE_DIR) + contextName);
+								contextParameters.getParameterValue(ContextParameter.JSON_PUBLISH_RELATIVE_DIR) + contextName);
 					}
 					outputObject.put(JsonKeys.worksheetId.name(),
 							worksheetId);

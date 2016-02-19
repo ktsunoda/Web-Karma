@@ -61,18 +61,18 @@ import edu.isi.karma.kr2rml.writer.N3KR2RMLRDFWriter;
 import edu.isi.karma.kr2rml.writer.SFKR2RMLRDFWriter;
 import edu.isi.karma.modeling.Namespaces;
 import edu.isi.karma.modeling.Uris;
-import edu.isi.karma.modeling.ontology.OntologyManager;
 import edu.isi.karma.rep.HNode;
 import edu.isi.karma.rep.RepFactory;
 import edu.isi.karma.rep.Row;
 import edu.isi.karma.rep.Worksheet;
+import edu.isi.karma.rep.Workspace;
 
 public class KR2RMLWorksheetRDFGenerator {
 
+	protected Workspace workspace;
 	protected RepFactory factory;
 	protected Worksheet worksheet;
 	protected String outputFileName;
-	protected OntologyManager ontMgr;
 	protected ErrorReport errorReport;
 	protected boolean addColumnContextInformation;
 	protected KR2RMLMapping kr2rmlMapping;
@@ -86,10 +86,10 @@ public class KR2RMLWorksheetRDFGenerator {
 	private URIFormatter uriFormatter;
 	private RootStrategy strategy;
 	private SuperSelection selection;
-	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, RepFactory factory, 
-			OntologyManager ontMgr, String outputFileName, boolean addColumnContextInformation, 
+	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, Workspace workspace, 
+			String outputFileName, boolean addColumnContextInformation, 
 			KR2RMLMapping kr2rmlMapping, ErrorReport errorReport, SuperSelection sel) throws UnsupportedEncodingException, FileNotFoundException {
-		initializeMemberVariables(worksheet, factory, ontMgr, outputFileName,
+		initializeMemberVariables(worksheet, workspace, outputFileName,
 				addColumnContextInformation, kr2rmlMapping, errorReport);
 		File f = new File(this.outputFileName);
 		File parentDir = f.getParentFile();
@@ -101,31 +101,29 @@ public class KR2RMLWorksheetRDFGenerator {
 
 	}
 
-	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, RepFactory factory, 
-			OntologyManager ontMgr, KR2RMLRDFWriter writer, boolean addColumnContextInformation,RootStrategy strategy, 
+	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, Workspace workspace, KR2RMLRDFWriter writer, boolean addColumnContextInformation,RootStrategy strategy, 
 			KR2RMLMapping kr2rmlMapping, ErrorReport errorReport, SuperSelection sel) {
-		initializeMemberVariables(worksheet, factory, ontMgr, outputFileName,
+		initializeMemberVariables(worksheet, workspace, outputFileName,
 				addColumnContextInformation, kr2rmlMapping, errorReport);
 		this.outWriters.add(writer);
 		this.strategy = strategy;
 		this.selection = sel;
 	}
 
-	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, RepFactory factory, 
-			OntologyManager ontMgr, List<KR2RMLRDFWriter> writers, boolean addColumnContextInformation,  
+	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, Workspace workspace, 
+			List<KR2RMLRDFWriter> writers, boolean addColumnContextInformation,  
 			KR2RMLMapping kr2rmlMapping, ErrorReport errorReport, SuperSelection sel) {
-		initializeMemberVariables(worksheet, factory, ontMgr, outputFileName,
+		initializeMemberVariables(worksheet, workspace, outputFileName,
 				addColumnContextInformation, kr2rmlMapping, errorReport);
 		this.outWriters.addAll(writers);
 		this.selection = sel;
 	}
 
-	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, RepFactory factory, 
-			OntologyManager ontMgr, List<KR2RMLRDFWriter> writers, boolean addColumnContextInformation, 
+	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, Workspace workspace, List<KR2RMLRDFWriter> writers, boolean addColumnContextInformation, 
 			RootStrategy strategy,  List<String> tripleMapToKill, List<String> tripleMapToStop, 
 			List<String> POMToKill, 
 			KR2RMLMapping kr2rmlMapping, ErrorReport errorReport, SuperSelection sel) {
-		initializeMemberVariables(worksheet, factory, ontMgr, outputFileName,
+		initializeMemberVariables(worksheet, workspace, outputFileName,
 				addColumnContextInformation, kr2rmlMapping, errorReport);
 		this.strategy = strategy;
 		this.tripleMapToKill = tripleMapToKill;
@@ -135,11 +133,11 @@ public class KR2RMLWorksheetRDFGenerator {
 		this.selection = sel;
 	}
 
-	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, RepFactory factory, 
-			OntologyManager ontMgr, PrintWriter writer, KR2RMLMapping kr2rmlMapping,   
+	public KR2RMLWorksheetRDFGenerator(Worksheet worksheet, Workspace workspace, 
+			 PrintWriter writer, KR2RMLMapping kr2rmlMapping,   
 			ErrorReport errorReport, boolean addColumnContextInformation, SuperSelection sel) {
 		super();
-		initializeMemberVariables(worksheet, factory, ontMgr, outputFileName,
+		initializeMemberVariables(worksheet, workspace, outputFileName,
 				addColumnContextInformation, kr2rmlMapping, errorReport);
 		this.outWriters.add(new N3KR2RMLRDFWriter(uriFormatter, writer));
 		this.selection = sel;
@@ -147,16 +145,17 @@ public class KR2RMLWorksheetRDFGenerator {
 
 
 	private void initializeMemberVariables(Worksheet worksheet,
-			RepFactory factory, OntologyManager ontMgr, String outputFileName,
+			Workspace workspace, String outputFileName,
 			boolean addColumnContextInformation, KR2RMLMapping kr2rmlMapping,
 			ErrorReport errorReport) {
-		this.ontMgr = ontMgr;
+	//	
 		this.kr2rmlMapping = kr2rmlMapping;
-		this.factory = factory;
+		this.workspace = workspace;
+		this.factory = workspace.getFactory();
 		this.worksheet = worksheet;
 		this.outputFileName = outputFileName;
 		this.errorReport = errorReport;
-		this.uriFormatter = new URIFormatter(ontMgr, errorReport);
+		this.uriFormatter = new URIFormatter(kr2rmlMapping.getPrefixes(), errorReport);
 		this.hNodeToContextUriMap = new ConcurrentHashMap<String, String>();
 		this.addColumnContextInformation = addColumnContextInformation;
 		this.translator = new KR2RMLMappingColumnNameHNodeTranslator(factory, worksheet);
@@ -214,7 +213,7 @@ public class KR2RMLWorksheetRDFGenerator {
 				}
 			}
 			int i=1;
-			TriplesMapPlanExecutor e = new TriplesMapPlanExecutor();
+			TriplesMapPlanExecutor e = new TriplesMapPlanExecutor(false);
 			Map<TriplesMap, TriplesMapWorkerPlan> triplesMapToWorkerPlan = new HashMap<TriplesMap, TriplesMapWorkerPlan>() ;
 			for(TriplesMap triplesMap : kr2rmlMapping.getTriplesMapList())
 			{

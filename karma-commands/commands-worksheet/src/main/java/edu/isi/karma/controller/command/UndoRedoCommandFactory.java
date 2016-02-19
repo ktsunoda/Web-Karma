@@ -20,9 +20,9 @@
  ******************************************************************************/
 package edu.isi.karma.controller.command;
 
-import edu.isi.karma.rep.Workspace;
-
 import javax.servlet.http.HttpServletRequest;
+
+import edu.isi.karma.rep.Workspace;
 
 public class UndoRedoCommandFactory extends CommandFactory {
 
@@ -34,7 +34,7 @@ public class UndoRedoCommandFactory extends CommandFactory {
 	public Command createCommand(HttpServletRequest request,
 			Workspace workspace) {
 		String commandId = request.getParameter(Arguments.commandId.name());
-		return new UndoRedoCommand(getNewId(workspace), commandId);
+		return new UndoRedoCommand(getNewId(workspace), Command.NEW_MODEL, commandId);
 	}
 
 	@Override

@@ -22,6 +22,8 @@
 package edu.isi.karma.modeling.alignment.learner;
 
 
+import java.text.DecimalFormat;
+
 import edu.isi.karma.modeling.alignment.SemanticModel;
 import edu.isi.karma.rep.alignment.LabeledLink;
 
@@ -30,14 +32,14 @@ public class SortableSemanticModel extends SemanticModel
 	
 	private double cost;
 	private SteinerNodes steinerNodes;
-	private Coherence linkCoherence;
+	private LinkCoherence linkCoherence;
 	
 	public SortableSemanticModel(SemanticModel semanticModel, SteinerNodes steinerNodes) {
 		
 		super(semanticModel);
 		
 		this.steinerNodes = steinerNodes;
-		this.linkCoherence = new Coherence();
+		this.linkCoherence = new LinkCoherence();
 		
 		if (this.graph != null && this.graph.edgeSet().size() > 0) {
 			this.cost = this.computeCost();
@@ -48,7 +50,7 @@ public class SortableSemanticModel extends SemanticModel
 	public SortableSemanticModel(SemanticModel semanticModel) {
 		
 		super(semanticModel);
-		this.linkCoherence = new Coherence();
+		this.linkCoherence = new LinkCoherence();
 		
 		if (this.graph != null && this.graph.edgeSet().size() > 0) {
 			this.cost = this.computeCost();
@@ -64,14 +66,19 @@ public class SortableSemanticModel extends SemanticModel
 		return cost;
 	}
 
-	public double getScore() {
-		return this.steinerNodes.getScore();
+	public double getConfidenceScore() {
+		return (this.steinerNodes == null || this.steinerNodes.getConfidence() == null) ? 
+				0.0 : this.steinerNodes.getConfidence().getConfidenceValue();
 	}
 	
 	public SteinerNodes getSteinerNodes() {
 		return this.steinerNodes;
 	}
 	
+	public Coherence getLinkCoherence() {
+		return this.linkCoherence;
+	}
+
 	private double computeCost() {
 		double cost = 0.0;
 		for (LabeledLink e : this.graph.edgeSet()) {
@@ -82,10 +89,17 @@ public class SortableSemanticModel extends SemanticModel
 
 	private void computeCoherence() {
 		for (LabeledLink l : this.graph.edgeSet()) {
-			linkCoherence.updateCoherence(l.getModelIds());
+			linkCoherence.updateCoherence(this.getGraph(), l);
 		}
 	}
 
+	public double getScore() {
+		if (this.steinerNodes != null)
+			return this.steinerNodes.getScore();
+		else
+			return 0.0;
+	}
+	
 //	private List<Integer> computeCoherence() {
 //		
 //		if (this.getGraph().edgeSet().size() == 0)
@@ -133,24 +147,7 @@ public class SortableSemanticModel extends SemanticModel
 //		else
 //			return 0;
 //	}
-//	
-//	private static int compareCoherence(List<Integer> c1, List<Integer> c2) {
-//		if (c1 == null || c2 == null)
-//			return 0;
-//		
-//		for (int i = 0; i < c1.size(); i++) {
-//			if (i < c2.size()) {
-//				if (c1.get(i) > c2.get(i)) return 1;
-//				else if (c1.get(i) < c2.get(i)) return -1;
-//			}
-//		}
-//		if (c1.size() < c2.size())
-//			return 1;
-//		else if (c2.size() < c1.size())
-//			return -1;
-//		else
-//			return 0;
-//	}
+
 	
 	@Override
 	public int compareTo(SortableSemanticModel m) {
@@ -158,27 +155,60 @@ public class SortableSemanticModel extends SemanticModel
 		int lessThan = 1;
 		int greaterThan = -1;
 		
-		double score1 = this.getScore();
-		double score2 = m.getScore();
+		double confidenceScore1 = this.getConfidenceScore();
+		double confidenceScore2 = m.getConfidenceScore();
+//		double score1 = this.getScore();
+//		double score2 = m.getScore();
 
 		double linkCoherence1 = this.linkCoherence.getCoherenceValue();
 		double linkCoherence2 = m.linkCoherence.getCoherenceValue();
-		
-		if (score1 > score2)
-			return greaterThan;
-		else if (score1 < score2)
-			return lessThan;
-		else if (linkCoherence1 > linkCoherence2)
+
+		if (linkCoherence1 > linkCoherence2)
 			return greaterThan;
 		else if (linkCoherence1 < linkCoherence2)
 			return lessThan;
-		else if (this.cost < m.cost)
+
+//		if (score1 > score2)
+//			return greaterThan;
+//		else if (score1 < score2)
+//			return lessThan;	
+
+		if (confidenceScore1 > confidenceScore2)
+			return greaterThan;
+		else if (confidenceScore1 < confidenceScore2)
+			return lessThan;
+		
+		if (this.cost < m.cost)
 			return greaterThan;
 		else if (m.cost < this.cost)
 			return lessThan;
-		else {
-			return 0;
-		}
+		
+	
+		
+		return 0;
+		
 	}
 
+	private static double roundDecimals(double d, int k) {
+		String format = "";
+		for (int i = 0; i < k; i++) format += "#";
+        DecimalFormat DForm = new DecimalFormat("#." + format);
+        return Double.valueOf(DForm.format(d));
+	}
+	
+	public String getRankingDetails() {
+		
+		String label = "";
+		label +=
+//				(m.getSteinerNodes() == null ? "" : m.getSteinerNodes().getScoreDetailsString()) +
+				"link coherence:" + (this.getLinkCoherence() == null ? "" : this.getLinkCoherence().getCoherenceValue()) + "\n";
+		label += (this.getSteinerNodes() == null || this.getSteinerNodes().getCoherence() == null) ? 
+				"" : "node coherence:" + this.getSteinerNodes().getCoherence().getCoherenceValue() + "\n";
+		label += "confidence:" + this.getConfidenceScore() + "\n";
+		label += this.getSteinerNodes() == null ? "" : "mapping score:" + this.getSteinerNodes().getScore() + "\n";
+		label +=
+				"cost:" + roundDecimals(this.getCost(), 6) + "\n";
+		return label;
+
+	}
 }

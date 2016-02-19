@@ -38,7 +38,7 @@ public class SubmitEditPythonTransformationCommandFactory extends JSONInputComma
 	private enum Arguments {
 		newColumnName, transformationCode, worksheetId, 
 		hNodeId, errorDefaultValue, previousCommandId, 
-		targetHNodeId, selectionName
+		targetHNodeId, selectionName, isJSONOutput
 	}
 	
 	@Override
@@ -48,7 +48,7 @@ public class SubmitEditPythonTransformationCommandFactory extends JSONInputComma
 	}
 
 	@Override
-	public Command createCommand(JSONArray inputJson, Workspace workspace) throws JSONException, KarmaException {
+	public Command createCommand(JSONArray inputJson, String model, Workspace workspace) throws JSONException, KarmaException {
 		String worksheetId = HistoryJsonUtil.getStringValue(Arguments.worksheetId.name(), inputJson);
 		String newColumnName = HistoryJsonUtil.getStringValue(Arguments.newColumnName.name(), inputJson);
 		String code = HistoryJsonUtil.getStringValue(Arguments.transformationCode.name(), inputJson);
@@ -58,9 +58,16 @@ public class SubmitEditPythonTransformationCommandFactory extends JSONInputComma
 		String targetHNodeId = HistoryJsonUtil.getStringValue(Arguments.targetHNodeId.name(), inputJson);
 		this.normalizeSelectionId(worksheetId, inputJson, workspace);
 		String selectionName = CommandInputJSONUtil.getStringValue(Arguments.selectionName.name(), inputJson);
-		SubmitEditPythonTransformationCommand comm = new SubmitEditPythonTransformationCommand(getNewId(workspace), 
+		boolean isJSONOutput = false;
+		try {
+			isJSONOutput = Boolean.parseBoolean(CommandInputJSONUtil.getStringValue(Arguments.isJSONOutput.name(), inputJson));
+		}
+		catch(Exception e)
+		{}
+		SubmitEditPythonTransformationCommand comm = new SubmitEditPythonTransformationCommand(
+				getNewId(workspace), model,
 				newColumnName, code, worksheetId, hNodeId, errorDefaultValue, targetHNodeId, 
-				selectionName);
+				selectionName, isJSONOutput);
 		comm.setInputParameterJson(inputJson.toString());
 		return comm;
 	}

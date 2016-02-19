@@ -1,4 +1,4 @@
-function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutofStatus) {
+function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutofStatus, isPyTransform, error) {
 
 	var worksheetId = wsId;
 	var columnTitle = wsColumnTitle;
@@ -47,7 +47,7 @@ function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutof
 		}, {
 			name: "PyTransform",
 			func: pyTransform,
-			leafOnly: true,
+			leafOnly: false,
 			leafExcluded: false
 		}, 
 		{
@@ -63,13 +63,14 @@ function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutof
 			leafOnly: true,
 			leafExcluded: false
 		},
-
+/*
 		{
 			name: "Invoke Service",
 			func: invokeService,
 			leafOnly: true,
 			leafExcluded: false
 		},
+*/
 		//{name:"Show Chart", func:showChart, leafOnly:true, leafExcluded: false},
 		{
 			name: "divider",
@@ -83,12 +84,12 @@ function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutof
 			leafOnly: false,
 			leafExcluded: true
 		}, {
-			name: "Unfold",
+			name: "Unfold Columns",
 			func: Unfold,
 			leafOnly: true,
 			leafExcluded: false
 		}, {
-			name: "Fold",
+			name: "Fold Columns",
 			func: Fold,
 			leafOnly: false,
 			leafExcluded: true
@@ -168,6 +169,17 @@ function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutof
 	function refreshRows() {
 		var headers = getColumnHeadingsForColumn(wsId, wsColumnId, "GroupBy");
 		var info = generateInfoObject(wsId, headers[0]['HNodeId'], "RefreshSelectionCommand");
+		var newInfo = info['newInfo'];
+		info["newInfo"] = JSON.stringify(newInfo);
+		showLoading(worksheetId);
+		sendRequest(info, worksheetId);
+	}
+
+	function refreshPython() {
+		console.log("refreshPython!");
+		console.log(wsColumnId);
+		console.log($("#" + wsColumnId).data("pythonTransformation"));
+		var info = generateInfoObject(wsId, wsColumnId, "RepeatPythonTransformationCommand");
 		var newInfo = info['newInfo'];
 		info["newInfo"] = JSON.stringify(newInfo);
 		showLoading(worksheetId);
@@ -343,6 +355,15 @@ function TableColumnOptions(wsId, wsColumnId, wsColumnTitle, isLeafNode, isOutof
 			a.click(refreshRows);
 			a.append($("<span>").addClass("glyphicon glyphicon-refresh"));
 			div.append(a);
+		}
+		if (isPyTransform) {
+			var a = $("<a>").attr("href", "#");
+			a.click(refreshPython);
+			a.append($("<span>").addClass("glyphicon glyphicon-repeat"));
+			div.append(a);
+		}
+		if (error) {
+			div.append($("<span>").addClass("glyphicon glyphicon-remove"));
 		}
 		var ul = $("<ul>").addClass("dropdown-menu");
 		ul.attr("role", "menu")
@@ -949,7 +970,10 @@ var PyTransformDialog = (function() {
 				console.log("Code has not changed, we do not need to perform an edit");
 				return;
 			}
-
+			var isJSONOutput = "false";
+			if ($("#pythonTransformUseJSONOutput").prop("checked")) {
+				isJSONOutput = "true"
+			}
 
 			// prepare the JSON Object to be sent to the server
 			var info = generateInfoObject(worksheetId, hNode.data("columnDerivedFrom"), "SubmitEditPythonTransformationCommand");
@@ -959,6 +983,7 @@ var PyTransformDialog = (function() {
 			newInfo.push(getParamObject("previousCommandId", hNode.data("previousCommandId"), "other"));
 			newInfo.push(getParamObject("errorDefaultValue", $("#pythonTransformErrorDefaultValue").val(), "other"));
 			newInfo.push(getParamObject("targetHNodeId", columnId, "hNodeId"));
+			newInfo.push(getParamObject("isJSONOutput", isJSONOutput, "other"));
 			info["newInfo"] = JSON.stringify(newInfo);
 
 			showLoading(worksheetId);
@@ -989,13 +1014,17 @@ var PyTransformDialog = (function() {
 			}
 
 			hide();
-
+			var isJSONOutput = "false";
+			if ($("#pythonTransformUseJSONOutput").prop("checked")) {
+				isJSONOutput = "true"
+			}
 			// prepare the JSON Object to be sent to the server
 			var info = generateInfoObject(worksheetId, hNodeId, "SubmitPythonTransformationCommand");
 			var newInfo = info['newInfo'];
 			newInfo.push(getParamObject("newColumnName", columnName, "other"));
 			newInfo.push(getParamObject("transformationCode", editor.getValue(), "other"));
 			newInfo.push(getParamObject("errorDefaultValue", $("#pythonTransformErrorDefaultValue").val(), "other"));
+			newInfo.push(getParamObject("isJSONOutput", isJSONOutput, "other"));
 			// newInfo.push(getParamObject("useExistingColumnName",
 			// useExistingColumnName, "useExistingColumnName"));
 			info["newInfo"] = JSON.stringify(newInfo);
@@ -1051,13 +1080,17 @@ var ExtractEntitiesDialog = (function() {
 		entitySelDialog.modal('hide');
 
 		var worksheetId, columnId;
-
+		var serviceInBuilt = true;
+		
 		function init() {
 			// Initialize what happens when we show the dialog
 			dialog.on('show.bs.modal', function(e) {
 				console.log("dialog displayed");
 				hideError();
 				$('#extractionService_URL').val("http://karmanlp.isi.edu:8080/ExtractionService/StanfordCoreNLP");
+				if(serviceInBuilt) {
+					$('#btnSave', dialog).click();
+				}
 			});
 
 			// Initialize handler for Save button
@@ -1083,7 +1116,10 @@ var ExtractEntitiesDialog = (function() {
 			info["hTableId"] = "";
 			info["extractionURL"] = $('#extractionService_URL').val();
 
-			dialog.modal('hide');
+			window.setTimeout(function() {
+				dialog.modal('hide');
+			}, 100);
+			
 			var newInfo = info['newInfo'];
 			newInfo.push(getParamObject("extractionURL", info["extractionURL"], "other"));
 			
@@ -1092,50 +1128,59 @@ var ExtractEntitiesDialog = (function() {
 			// console.log(info["worksheetId"]);
 			showLoading(info["worksheetId"]);
 
-			var userSelResp = $.ajax({
-				url: $('#extractionService_URL').val() + "/getCapabilities",
-				type: "GET",
-				dataType: "json",
-				contentType: "text/plain",
-				crossDomain: true,
-				complete: function(xhr, textStatus) {
-					console.log(xhr.responseText);
-					var jsonresp = $.parseJSON(xhr.responseText);
+			displayCapabilities = function(jsonStr) {
+				var jsonresp = $.parseJSON(jsonStr);
+				var dialogContent = $("#userSelection", entitySelDialog);
+				dialogContent.empty();
 
-					var dialogContent = $("#userSelection", entitySelDialog);
-					dialogContent.empty();
+				$.each(jsonresp, function(index, data) {
+					var row = $("<div>").addClass("checkbox");
+					var label = $("<label>").text(data.capability);
+					var input = $("<input>")
+						.attr("type", "checkbox")
+						.attr("id", "selectentities")
+						.attr("value", data.capability);
+					label.append(input);
+					row.append(label);
+					dialogContent.append(row);
+				});
 
-					$.each(jsonresp, function(index, data) {
-						var row = $("<div>").addClass("checkbox");
-						var label = $("<label>").text(data.capability);
-						var input = $("<input>")
-							.attr("type", "checkbox")
-							.attr("id", "selectentities")
-							.attr("value", data.capability);
-						label.append(input);
-						row.append(label);
-						dialogContent.append(row);
-					});
+				//Initialize handler for Save button
+				//var me = this;
+				$('#btnSave', entitySelDialog).on('click', function(e) {
+					e.preventDefault();
+					saveUserSelDialog(e, info);
+				});
 
-					//Initialize handler for Save button
-					//var me = this;
-					$('#btnSave', entitySelDialog).on('click', function(e) {
-						e.preventDefault();
-						saveUserSelDialog(e, info);
-					});
+				//display user selection dialog
+				entitySelDialog.modal('show');
+				console.log("User selection dialog displayed");
 
-					//display user selection dialog
-					entitySelDialog.modal('show');
-					console.log("User selection dialog displayed");
-
-					hideLoading(info["worksheetId"]);
-				},
-				error: function(xhr, textStatus) {
-					console.log("error");
-					alert("Error occured while getting capabilities from the specified service:" + textStatus);
-					hideLoading(info["worksheetId"]);
-				}
-			});
+				hideLoading(info["worksheetId"]);
+			}
+			
+			var jsonStr;
+			if(serviceInBuilt) {
+				jsonStr = "[    {         \"capability\": \"Places\"     },    {     \"capability\": \"People\" },  {     \"capability\": \"Dates\" } ]"; 
+				displayCapabilities(jsonStr);
+			} else {
+				var userSelResp = $.ajax({
+					url: $('#extractionService_URL').val() + "/getCapabilities",
+					type: "GET",
+					dataType: "json",
+					contentType: "text/plain",
+					crossDomain: true,
+					complete: function(xhr, textStatus) {
+						console.log(xhr.responseText);
+						displayCapabilities(xhr.responseText);
+					},
+					error: function(xhr, textStatus) {
+						console.log("error");
+						alert("Error occured while getting capabilities from the specified service:" + textStatus);
+						hideLoading(info["worksheetId"]);
+					}
+				});
+			}
 
 		};
 
@@ -1349,12 +1394,14 @@ var UnfoldDialog = (function() {
 				return;
 			}
 			var checked = checkboxes[0];
-
+			var otherColumns = $('#unfoldOtherColumns input[type="checkbox"]', dialog).is(":checked");
 			//console.log(checked);
+			console.log(otherColumns);
 			var info = generateInfoObject(worksheetId, "", "UnfoldCommand");
 			var newInfo = info['newInfo'];
 			newInfo.push(getParamObject("keyhNodeId", columnId, "hNodeId"));
 			newInfo.push(getParamObject("valuehNodeId", checked['value'], "hNodeId"));
+			newInfo.push(getParamObject("notOtherColumn", otherColumns ? "false" : "true", "other"));
 			info["newInfo"] = JSON.stringify(newInfo);
 			showLoading(info["worksheetId"]);
 			var returned = sendRequest(info, worksheetId);
@@ -1562,7 +1609,7 @@ var GlueDialog = (function() {
 		function saveDialog(e) {
 			console.log("Save clicked");
 
-			var checkboxes = dialog.find(":checked");
+			var checkboxes = $("#glueDialogColumns").find(":checked");
 			var checked = [];
 			for (var i = 0; i < checkboxes.length; i++) {
 				var checkbox = checkboxes[i];
@@ -1572,11 +1619,13 @@ var GlueDialog = (function() {
 				hide();
 				return;
 			}
+			var selected = $("#glueDialogImplWays").find(":selected");
 			//console.log(checked);
 			var info = generateInfoObject(worksheetId, checkboxes[0]['value'], "GlueCommand");
 
 			var newInfo = info['newInfo'];
-			newInfo.push(getParamObject("values", JSON.stringify(checked), "hNodeIdList"));
+			newInfo.push(getParamObject("values", JSON.stringify(checked), "hNodeIdList"))
+			newInfo.push(getParamObject("ImplMethod", selected.val(), "other"));
 			info["newInfo"] = JSON.stringify(newInfo);
 
 			showLoading(info["worksheetId"]);
@@ -1602,6 +1651,7 @@ var GlueDialog = (function() {
 					hide();
 					return;
 				}
+				$('#glueDialogImplWays option[value="Longest"]').attr("selected", true);
 				//console.log(headers);
 				for (var i = 0; i < headers.length; i++) {
 

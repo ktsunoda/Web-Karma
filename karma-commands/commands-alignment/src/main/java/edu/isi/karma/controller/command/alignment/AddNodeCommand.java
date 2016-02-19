@@ -36,8 +36,8 @@ public class AddNodeCommand extends WorksheetCommand {
 	private Alignment oldAlignment;
 	private DirectedWeightedMultigraph<Node, DefaultLink> oldGraph;
 		
-	protected AddNodeCommand(String id, String worksheetId, String alignmentId, String uri, String label) {
-		super(id, worksheetId);
+	protected AddNodeCommand(String id, String model, String worksheetId, String alignmentId, String uri, String label) {
+		super(id, model, worksheetId);
 		this.alignmentId = alignmentId;
 		this.nodeUri = uri;
 		this.nodeLabel = label;
@@ -80,12 +80,14 @@ public class AddNodeCommand extends WorksheetCommand {
 
 		try {
 			alignment.addForcedInternalNode(new Label(nodeUri));
-			alignment.align();
+			if(!this.isExecutedInBatch())
+				alignment.align();
+			
 		} catch (JSONException e) {
 			logger.error("Error adding Internal Node:" , e);
 		}
 
-		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace, alignment);
+		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace);
 	}
 
 	@Override
@@ -96,7 +98,7 @@ public class AddNodeCommand extends WorksheetCommand {
 		oldAlignment.setGraph(oldGraph);
 
 		// Get the alignment update
-		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace, oldAlignment);
+		return WorksheetUpdateFactory.createSemanticTypesAndSVGAlignmentUpdates(worksheetId, workspace);
 	}
 
 	

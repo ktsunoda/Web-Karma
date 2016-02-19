@@ -6,14 +6,7 @@ import edu.isi.karma.cleaning.ParseTreeNode.nodetype;
 
 public class ProgramParser {
 	public ParseTreeNode root = null;
-
 	public ProgramParser() {
-
-	}
-
-	public ProgramParser(String program) {
-		this.root = this.parse(program);
-
 	}
 
 	// parse the sub program with a sequence of segment
@@ -51,6 +44,9 @@ public class ProgramParser {
 		// find the endPosition
 		int eposS = sposE+2;
 		int eposE = tok.length()-1;
+		if(sposS > 15){
+			eposE = tok.length() -2;
+		}
 		String eposExpre = tok.substring(eposS, eposE);
 		ParseTreeNode sPosNode = new ParseTreeNode(nodetype.position,
 				sposExpre);

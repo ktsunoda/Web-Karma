@@ -40,8 +40,8 @@ public class RamblerTransformationOutput implements TransformationOutput {
 	private RamblerTransformationInputs input;
 	private HashMap<String, Transformation> transformations;
 	public boolean nullRule = false;
-
 	public RamblerTransformationOutput(RamblerTransformationInputs input) {
+		
 		this.input = input;
 		transformations = new HashMap<String, Transformation>();
 		ExecutorService executor = Executors.newFixedThreadPool(1);
@@ -57,6 +57,7 @@ public class RamblerTransformationOutput implements TransformationOutput {
 		try {
 			worker.get(3000, TimeUnit.SECONDS);
 		} catch (Exception e) {
+			logger.error(e.toString());
 			nullRule = true;
 			transformations.clear();
 		}
@@ -77,6 +78,7 @@ public class RamblerTransformationOutput implements TransformationOutput {
 		// add time out here
 		Collection<ProgramRule> rules = null;
 		rules = psProgSynthesis.adaptive_main();
+		//rules = psProgSynthesis.run_main();
 		input.msg.updateCM_Constr(psProgSynthesis.partiCluster.getConstraints());
 		input.msg.updateWeights(psProgSynthesis.partiCluster.weights);
 
@@ -95,13 +97,9 @@ public class RamblerTransformationOutput implements TransformationOutput {
 				transformations.put(r.signature, r);
 			}
 		}
-		// RamblerTransformation r = new
-		// RamblerTransformation(psProgSynthesis.getBestRule());
-		// transformations.put("BESTRULE",r);
 	}
 
 	public HashMap<String, Transformation> getTransformations() {
-		// TODO Auto-generated method stub
 		return transformations;
 	}
 
@@ -144,7 +142,7 @@ public class RamblerTransformationOutput implements TransformationOutput {
 				val = t.transform_debug(orgval);
 				cLabel = t.getClassLabel(orgval);
 			} else {
-				val = "";
+				val = t.transform_debug(val);;
 				cLabel = t.getClassLabel(val);
 			}
 			vo.setValue(k, val);

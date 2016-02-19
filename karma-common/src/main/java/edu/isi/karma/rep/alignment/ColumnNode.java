@@ -34,66 +34,54 @@ public class ColumnNode extends Node {
 	private final String hNodeId;
 	private final String columnName;
 	private Label rdfLiteralType;
+	private ColumnSemanticTypeStatus semanticTypeStatus; 
 
-	private InternalNode domainNode;
-	private LabeledLink domainLink;
-	
-	private SemanticType userSelectedSemanticType;
-	private List<SemanticType> suggestedSemanticTypes;
+	private List<SemanticType> userSemanticTypes;
+	private List<SemanticType> learnedSemanticTypes;
 	
 	public ColumnNode(String id, String hNodeId, String columnName, Label rdfLiteralType) {
 		super(id, new Label(hNodeId), NodeType.ColumnNode);
 		this.hNodeId = hNodeId;
 		this.columnName = columnName;
 		this.setRdfLiteralType(rdfLiteralType);
-		this.userSelectedSemanticType = null;
-		this.suggestedSemanticTypes = null;
+		this.userSemanticTypes = null;
+		this.learnedSemanticTypes = null;
+		this.semanticTypeStatus = ColumnSemanticTypeStatus.NotAssigned;
 	}
-
 	
-	public InternalNode getDomainNode() {
-		return domainNode;
+	public void includeInAutoModel() {
+		this.semanticTypeStatus = ColumnSemanticTypeStatus.AutoAssigned;
+	}
+	
+	public ColumnSemanticTypeStatus getSemanticTypeStatus() {
+		return semanticTypeStatus;
 	}
 
-
-	public void setDomainNode(InternalNode domainNode) {
-		this.domainNode = domainNode;
+	public List<SemanticType> getLearnedSemanticTypes() {
+		return learnedSemanticTypes;
 	}
 
-
-	public LabeledLink getDomainLink() {
-		return domainLink;
-	}
-
-
-	public void setDomainLink(LabeledLink domainLink) {
-		this.domainLink = domainLink;
-	}
-
-
-	public List<SemanticType> getSuggestedSemanticTypes() {
-		return suggestedSemanticTypes;
-	}
-
-	public void setSuggestedSemanticTypes(List<SemanticType> suggestedSemanticTypes) {
+	public void setLearnedSemanticTypes(List<SemanticType> learnedSemanticTypes) {
 		double sum = 0.0;
 		// normalizing the confidence scores
-		if (suggestedSemanticTypes != null) {
-			for (SemanticType st : suggestedSemanticTypes) {
+		if (learnedSemanticTypes != null) {
+			for (SemanticType st : learnedSemanticTypes) {
 				sum += st.getConfidenceScore() != null ? st.getConfidenceScore().doubleValue() : 0.0;
 			}
 			double confidence;
-			this.suggestedSemanticTypes = new ArrayList<SemanticType>();
-			for (SemanticType st : suggestedSemanticTypes) {
+			this.learnedSemanticTypes = new ArrayList<SemanticType>();
+			for (SemanticType st : learnedSemanticTypes) {
 				confidence = st.getConfidenceScore() != null ? st.getConfidenceScore() : 0.0;
 				SemanticType semType = new SemanticType(st.getHNodeId(), 
 						st.getType(), 
 						st.getDomain(), 
 						st.getOrigin(), 
 						confidence / sum);
-				this.suggestedSemanticTypes.add(semType);
+				this.learnedSemanticTypes.add(semType);
 			}
 		}
+		if (this.learnedSemanticTypes != null)
+			Collections.sort(this.learnedSemanticTypes, Collections.reverseOrder());
 	}
 
 	public String getHNodeId() {
@@ -121,23 +109,70 @@ public class ColumnNode extends Node {
 		this.rdfLiteralType = rdfLiteralType;
 	}
 	
-	public SemanticType getUserSelectedSemanticType() {
-		return userSelectedSemanticType;
+	public List<SemanticType> getUserSemanticTypes() {
+		if (userSemanticTypes == null)
+			this.userSemanticTypes = new ArrayList<SemanticType>();
+		return Collections.unmodifiableList(userSemanticTypes);
 	}
 
-	public void setUserSelectedSemanticType(SemanticType userSelectedSemanticType) {
-		this.userSelectedSemanticType = userSelectedSemanticType;
+//	public void setUserSemanticTypes(List<SemanticType> userSemanticTypes) {
+//		if (userSemanticTypes != null && !userSemanticTypes.isEmpty())
+//			this.semanticTypeStatus = ColumnSemanticTypeStatus.Assigned;
+//		this.userSemanticTypes = userSemanticTypes;
+//	}
+	
+	public void assignUserType(SemanticType newType) {
+		
+		if (newType == null)
+			return;
+		
+		if (userSemanticTypes == null)
+			this.userSemanticTypes = new ArrayList<SemanticType>();
+		
+		//FIXME: when user invokes SetSemanticType, we should unassign the old one, otherwise
+		// we don't know if user wants to add more types or replace the existing one
+		// currently, I assume that we replace the old one when a new type is assigned
+		this.userSemanticTypes.clear();
+		
+		this.userSemanticTypes.add(newType);
+		this.semanticTypeStatus = ColumnSemanticTypeStatus.UserAssigned;
+	}
+	
+	public void unassignUserType(SemanticType semanticType) {
+
+		if (semanticType == null) {
+			if (userSemanticTypes == null || userSemanticTypes.isEmpty())
+				this.semanticTypeStatus = ColumnSemanticTypeStatus.Unassigned;
+			return;
+		}
+		
+		int tobeDeletedIndex = -1;
+		if (userSemanticTypes != null) {
+			SemanticType st;
+			for (int i = 0; i < userSemanticTypes.size(); i++) {
+				st = userSemanticTypes.get(i); 
+				if (st.getModelLabelString().equalsIgnoreCase(semanticType.getModelLabelString())) {
+					tobeDeletedIndex = i;
+					break;
+				}
+			}
+		}
+		if (tobeDeletedIndex != -1) {
+			userSemanticTypes.remove(tobeDeletedIndex);
+		}
+		if (userSemanticTypes == null || userSemanticTypes.isEmpty())
+			this.semanticTypeStatus = ColumnSemanticTypeStatus.Unassigned;
 	}
 
-	public List<SemanticType> getTopKSuggestions(int k) {
+	public List<SemanticType> getTopKLearnedSemanticTypes(int k) {
 		
 		List<SemanticType> semanticTypes = new ArrayList<SemanticType>();
-		if (this.suggestedSemanticTypes == null || this.suggestedSemanticTypes.isEmpty())
+		if (this.learnedSemanticTypes == null || this.learnedSemanticTypes.isEmpty())
 			return semanticTypes;
 		
-		int n = Math.min(k, this.suggestedSemanticTypes.size());
-		Collections.sort(this.suggestedSemanticTypes, Collections.reverseOrder());
-		return this.suggestedSemanticTypes.subList(0, n);
+		int n = Math.min(k, this.learnedSemanticTypes.size());
+		Collections.sort(this.learnedSemanticTypes, Collections.reverseOrder());
+		return this.learnedSemanticTypes.subList(0, n);
 	}
 	
 }

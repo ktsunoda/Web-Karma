@@ -43,8 +43,8 @@ public class GetClassesCommand extends WorksheetCommand {
 
 	private static Logger logger = LoggerFactory.getLogger(GetClassesCommand.class.getSimpleName());
 
-	protected GetClassesCommand(String id, String worksheetId, INTERNAL_NODES_RANGE range, String propertyURI) {
-		super(id, worksheetId);
+	protected GetClassesCommand(String id, String model, String worksheetId, INTERNAL_NODES_RANGE range, String propertyURI) {
+		super(id, model, worksheetId);
 		this.range = range;
 		this.propertyURI = propertyURI;
 	}
@@ -188,9 +188,9 @@ public class GetClassesCommand extends WorksheetCommand {
 
 	private Set<Node> getNodesUsingAlignment(Workspace workspace, Set<Label> nodeLabels) {
 		Set<Node> nodeSet = new HashSet<>();
-		final OntologyManager ontMgr = workspace.getOntologyManager();
-		final Alignment alignment = AlignmentManager.Instance().getAlignmentOrCreateIt(
-				workspace.getId(), worksheetId, ontMgr);
+		
+		final Alignment alignment = AlignmentManager.Instance().getAlignment(
+				workspace.getId(), worksheetId);
 
 		final Set<String> steinerTreeNodeIds = new HashSet<String>();
 

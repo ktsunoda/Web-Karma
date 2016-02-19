@@ -50,11 +50,11 @@ public class SplitValuesCommand extends WorksheetSelectionCommand {
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-	protected SplitValuesCommand(String id, String worksheetId,
+	protected SplitValuesCommand(String id, String model, String worksheetId,
 			String hNodeId, String delimiter, String newColName, 
 			String newHNodeId,
 			String selectionId) {
-		super(id, worksheetId, selectionId);
+		super(id, model, worksheetId, selectionId);
 		this.hNodeId = hNodeId;
 		this.delimiter = delimiter;
 		this.newColName = newColName;
@@ -97,11 +97,12 @@ public class SplitValuesCommand extends WorksheetSelectionCommand {
 		}
 		
 		if (columnName.equals(newColName)) {
-			splitCommaCommand = new SplitByCommaCommand(workspace.getFactory().getNewId("C"), worksheetId, hNodeId, delimiter, selectionId);
+			splitCommaCommand = new SplitByCommaCommand(workspace.getFactory().getNewId("C"), 
+					model, worksheetId, hNodeId, delimiter, selectionId);
 			return splitCommaCommand.doIt(workspace);
 		}
 
-		logger.info("SplitValuesCommand:" + newColName + ", columnName:" + columnName);
+		logger.debug("SplitValuesCommand:" + newColName + ", columnName:" + columnName);
 		
 		HNode newhNode = null;
 		if(newHNodeId != null && newHNodeId.length() > 0)
@@ -122,7 +123,7 @@ public class SplitValuesCommand extends WorksheetSelectionCommand {
 			newHNodeId = newhNode.getId();
 			hNode.addAppliedCommand("SplitValuesCommand", newhNode);
 		} else {
-			logger.info("Column names are same, re-compute the split values");
+			logger.debug("Column names are same, re-compute the split values");
 			isUpdate = true;
 		}
 		
@@ -137,7 +138,7 @@ public class SplitValuesCommand extends WorksheetSelectionCommand {
 			c.add(new ErrorUpdate("Cannot split column! csv reader error"));
 			return c;
 		}
-		c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, selection));
+		c.append(WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, selection, workspace.getContextId()));
 
 		/** Add the alignment update **/
 		c.append(computeAlignmentAndSemanticTypesAndCreateUpdates(workspace));
@@ -156,6 +157,6 @@ public class SplitValuesCommand extends WorksheetSelectionCommand {
 		HTable hTable = factory.getHTable(hNode.getHTableId());
 		hTable.removeHNode(newHNodeId, factory.getWorksheet(worksheetId));
 		hNode.removeNestedTable();
-		return WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, selection);
+		return WorksheetUpdateFactory.createRegenerateWorksheetUpdates(worksheetId, selection, workspace.getContextId());
 	}
 }

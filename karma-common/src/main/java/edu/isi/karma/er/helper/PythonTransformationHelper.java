@@ -21,12 +21,8 @@
 
 package edu.isi.karma.er.helper;
 
-import java.io.File;
-import java.io.FilenameFilter;
-
 import org.python.core.PyObject;
 import org.python.core.PyType;
-import org.python.util.PythonInterpreter;
 
 import edu.isi.karma.controller.command.selection.SuperSelection;
 import edu.isi.karma.controller.command.selection.SuperSelectionManager;
@@ -34,8 +30,6 @@ import edu.isi.karma.rep.RepFactory;
 import edu.isi.karma.rep.Row;
 import edu.isi.karma.rep.Table;
 import edu.isi.karma.rep.Worksheet;
-import edu.isi.karma.webserver.ServletContextParameterMap;
-import edu.isi.karma.webserver.ServletContextParameterMap.ContextParameter;
 
 public class PythonTransformationHelper {
 
@@ -43,6 +37,8 @@ public class PythonTransformationHelper {
 	private static String isEmptyDefStatement = null;
 	private static String hasSelectedRowsStatement = null;
 	private static String importStatement = null;
+	private static String valueFromNestedColumnByIndexDefStatement = null;
+	private static String getRowIndexDefStatement = null;
 	public static String getPyObjectValueAsString(PyObject obj) {
 		if (obj == null)
 			return "";
@@ -76,22 +72,31 @@ public class PythonTransformationHelper {
 		return string.replaceAll(" ", "").replaceAll("[^\\p{L}\\p{N}]","");
 	}
 
-	public static String getPythonTransformMethodDefinitionState(Worksheet worksheet, String transformationCode) {
+	public static String getPythonTransformMethodDefinitionState(Worksheet worksheet, String transformationCode, String transformId) {
+		return getPythonMethodDefinition("transform", transformationCode, transformId);
+	}
+
+	public static String getPythonSelectionMethodDefinitionState(Worksheet worksheet, String code, String codeId) {
+		return getPythonMethodDefinition("selection", code, codeId);
+	}
+
+	private static String getPythonMethodDefinition(String methodName, String code, String codeId) {
 		StringBuilder methodStmt = new StringBuilder();
-		methodStmt.append("def transform(r):\n");
-		String lines[] = transformationCode.split("\\r?\\n");
+		methodStmt.append("def "+methodName+codeId+"(r):\n");
+		String lines[] = code.split("\\r?\\n");
 		for (String line:lines) {
 			methodStmt.append("\t" + line + "\n");
 		}
 		return methodStmt.toString();
 	}
-
+	
 	public static String getImportStatements() {
 		if(importStatement == null)
 		{
 			StringBuilder importStmt = new StringBuilder();
 			importStmt.append("import re\n");
 			importStmt.append("import datetime\n");
+			importStmt.append("import json\n");
 			importStmt.append("import edu.isi.karma.rep.WorkspaceManager\n");
 			importStmt.append("import edu.isi.karma.rep.Workspace\n");
 			importStmt.append("import edu.isi.karma.rep.Node\n");
@@ -106,6 +111,19 @@ public class PythonTransformationHelper {
 		return importStatement;
 	}
 
+	public static String getRowIndexDefStatement()
+	{
+		if(getRowIndexDefStatement == null)
+		{
+			StringBuilder methodStmt = new StringBuilder();
+			methodStmt.append("def getRowIndex():\n");
+			methodStmt.append("	factory = edu.isi.karma.rep.WorkspaceManager.getInstance().getWorkspace(workspaceid).getFactory()\n");
+			methodStmt.append("	node = factory.getNode(nodeid)\n");
+			methodStmt.append("	return node.getRowIndex()\n");
+			getRowIndexDefStatement = methodStmt.toString();
+		}
+		return getRowIndexDefStatement;
+	}
 	public static String getGetValueDefStatement() {
 
 		if(valueDefStatement == null)
@@ -113,13 +131,17 @@ public class PythonTransformationHelper {
 			StringBuilder methodStmt = new StringBuilder();
 			methodStmt.append("def getValue(columnName):\n");
 			methodStmt.append("	factory = edu.isi.karma.rep.WorkspaceManager.getInstance().getWorkspace(workspaceid).getFactory()\n");
+			methodStmt.append("	worksheet = factory.getWorksheet(worksheetId)\n");
 			methodStmt.append("	node = factory.getNode(nodeid)\n");
 			methodStmt.append("	targetNode = node.getNeighborByColumnName(columnName, factory)\n");
 			methodStmt.append("	if targetNode is not None:\n");
 			methodStmt.append("		command.addInputColumns(targetNode.getHNodeId())\n");
-			methodStmt.append("		value = targetNode.getValue()\n");
+			methodStmt.append("		superSelection = worksheet.getSuperSelectionManager().getSuperSelection(selectionName)\n");
+			methodStmt.append("		value = targetNode.serializeToJSON(superSelection, factory)\n");
 			methodStmt.append("		if value is not None:\n");
-			methodStmt.append("			valueAsString = value.asString()\n");
+			methodStmt.append("			valueAsString = value\n");
+			methodStmt.append("			if (not isinstance(value, str)) and (not isinstance(value, unicode)):\n");
+			methodStmt.append("				valueAsString = value.toString()\n");
 			methodStmt.append("			if valueAsString is not None:\n");
 			methodStmt.append("				return valueAsString\n");
 			methodStmt.append("	return ''\n");
@@ -151,6 +173,31 @@ public class PythonTransformationHelper {
 		return hasSelectedRowsStatement;
 	}
 
+	
+	public static String getGetValueFromNestedColumnByIndexDefStatement() {
+		
+		if(valueFromNestedColumnByIndexDefStatement == null)
+		{
+			StringBuilder methodStmt = new StringBuilder();
+			methodStmt.append("def getValueFromNestedColumnByIndex(columnName, nestedColumnName, index):\n");
+			methodStmt.append("	factory = edu.isi.karma.rep.WorkspaceManager.getInstance().getWorkspace(workspaceid).getFactory()\n");
+			methodStmt.append("	node = factory.getNode(nodeid)\n");
+			methodStmt.append("	targetNode = node.getNeighborByColumnNameWithNestedColumnByRowIndex(columnName, factory, nestedColumnName, index)\n");
+			methodStmt.append("	if targetNode is not None:\n");
+			methodStmt.append("		command.addInputColumns(targetNode.getHNodeId())\n");
+			methodStmt.append("		value = targetNode.getValue()\n");
+			methodStmt.append("		if value is not None:\n");
+			methodStmt.append("			valueAsString = value.asString()\n");
+			methodStmt.append("			if valueAsString is not None:\n");
+			methodStmt.append("				return valueAsString\n");
+			methodStmt.append("	return ''\n");
+			valueFromNestedColumnByIndexDefStatement = methodStmt.toString();
+		}
+		return valueFromNestedColumnByIndexDefStatement;
+	}
+	
+	
+	
 	public static String getIsEmptyDefStatement() {
 
 		if(isEmptyDefStatement == null)
@@ -188,6 +235,9 @@ public class PythonTransformationHelper {
 		return  "transform(nodeid)";
 	}
 
+	public static String getSelectionStatement() {
+		return  "selection(nodeid)";
+	}
 	public static boolean hasSelectedRows(Table nestedTable, RepFactory factory, String selectionName) {
 		Worksheet worksheet = factory.getWorksheet(nestedTable.getWorksheetId());
 		SuperSelection sel = worksheet.getSuperSelectionManager().getSuperSelection(selectionName);
@@ -198,22 +248,4 @@ public class PythonTransformationHelper {
 		return false;
 	}
 
-	public void importUserScripts(PythonInterpreter interpreter) {
-		String dirpathString = ServletContextParameterMap
-				.getParameterValue(ContextParameter.USER_PYTHON_SCRIPTS_DIRECTORY);
-
-		if (dirpathString != null && dirpathString.compareTo("") != 0) {
-			File f = new File(dirpathString);
-			String[] scripts = f.list(new FilenameFilter(){
-
-				@Override
-				public boolean accept(File dir, String name) {
-					return name.endsWith(".py");
-				}});
-			for(String script : scripts)
-			{
-				interpreter.execfile(dirpathString  + File.separator + script);
-			}
-		}
-	}
 }
