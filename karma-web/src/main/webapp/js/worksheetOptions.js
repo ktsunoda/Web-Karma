@@ -5,83 +5,7 @@ function WorksheetOptions(wsId, wsTitle) {
 	var worksheetOptionsDiv;
 
 	var options = [
-		{
-			name: "View model using straight lines",
-			func: viewStraightLineModel,
-			showCheckbox: true,
-			defaultChecked: true,
-			initFunc: initStrightLineModel
-		},
 	    {
-			name: "Organize Columns",
-			func: organizeColumns
-		}, 
-		{
-			name: "divider"
-		},
-
-		{
-			name: "Suggest Model",
-			func: undefined,
-			addLevel: true,
-			levels: [{
-				name: "Using Current Ontology",
-				func: suggestModel
-			}, {
-				name: "Generate New Ontology",
-				func: suggestAutoModel
-			}, ]
-		},
-
-		{
-			name: "Set Properties",
-			func: setProperties
-		},
-
-		{
-			name: "Apply R2RML Model",
-			func: undefined,
-			addLevel: true,
-			levels: [{
-				name: "From File",
-				func: applyR2RMLModel,
-				useFileUpload: true,
-				uploadDiv: "applyWorksheetHistory"
-			}, {
-				name: "From Repository",
-				func: applyModel
-			}]
-		}, {
-			name: "Add Node",
-			func: addNode
-		}, {
-			name:"Add Liternal Node", 
-			func:addLiteralNode
-		}, {
-			name: "divider"
-		},
-
-		{
-			name: "Publish",
-			func: undefined,
-			addLevel: true,
-			levels: [{
-				name: "RDF",
-				func: publishRDF
-			}, {
-				name: "Model",
-				func: publishModel
-			}, {
-				name: "Service Model",
-				func: publishServiceModel
-			}, {
-				name: "Report",
-				func: publishReport
-			}, {
-				name: "JSON",
-				func: saveAsJson
-			}, ]
-		}, {
 			name: "Export",
 			func: undefined,
 			addLevel: true,
@@ -91,69 +15,7 @@ function WorksheetOptions(wsId, wsTitle) {
 			}, {
 				name: "To Database",
 				func: exportToDatabase
-			}, {
-				name: "To MDB",
-				func: exportToMDB
-			}, {
-				name: "To SpatialData",
-				func: exportToSpatial
 			}, ]
-		}, {
-			name: "divider"
-		},
-
-		{
-			name: "Populate Source",
-			func: populateSource
-		}, {
-			name: "Invoke Service",
-			func: invokeService
-		}, {
-			name: "divider"
-		},
-
-		{
-			name: "Fold",
-			func: Fold
-		}, {
-			name: "GroupBy",
-			func: GroupBy
-		}, {
-			name: "Glue Columns",
-			func: Glue
-		}, {
-			name: "Delete",
-			func: deleteWorksheet
-		}, {
-			name: "divider"
-		}, {
-			name: "Selection",
-			func: undefined,
-			addLevel: true,
-			levels: [{
-				name: "Add Rows",
-				func: addRows
-			}, {
-				name: "Intersect Rows",
-				func: intersectRows
-			}, {
-				name: "Subtract Rows",
-				func: subtractRows
-			}, {
-				name: "Invert",
-				func: invertRows
-			}, {
-				name: "Clear",
-				func: undefined,
-				addLevel: true,
-				levels: [{
-					name: "In All Nested Tables",
-					func: clearAll
-				}, {
-					name: "In This Column",
-					func: clearThis
-				}]
-			}]
 		}
 	];
 

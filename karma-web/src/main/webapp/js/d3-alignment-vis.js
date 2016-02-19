@@ -30,8 +30,8 @@ function displayAlignmentTree_ForceKarmaLayout(json) {
 	
 	var w = 0;
 	var mainWorksheetDiv = $("div#" + worksheetId);
-	var layoutElement = "div#svgDiv_" + worksheetId;
-	
+    //var layoutElement = "div#svgDiv_" + worksheetId;
+	var layoutElement = null
 	if ($(mainWorksheetDiv).data("svgVis") != null) {
 		//w = $("div#svgDiv_"+worksheetId).width();
 		$(layoutElement).remove();

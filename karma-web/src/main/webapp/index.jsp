@@ -159,12 +159,12 @@ and related projects, please see: http://www.isi.edu/integration
 		            <span class="icon-bar"></span>
 		            <span class="icon-bar"></span>
 		          </button>
-		          <a class="navbar-brand" href="#">SmartEditor</a>
+		          <a class="navbar-brand" href="#" style="color: #ffffff">SmartEditor</a>
 		        </div>
-		        <div class="navbar-collapse collapse">
+		        <div class="navbar-collapse collapse" style="background-color: #c41200">
 		          <ul class="nav navbar-nav col-sm-5">
 		            <li class="dropdown">
-		              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Import <b class="caret"></b></a>
+		              <a href="#" class="dropdown-toggle" data-toggle="dropdown" style="color: #ffffff">Import <b class="caret"></b></a>
 		              <ul class="dropdown-menu multi-level">		            
 		                  <li><a href="#" class="fileinput-button"><form id="fileupload" action="ImportFileCommand" method="POST" enctype="multipart/form-data">From File<input type="file" name="files[]" multiple></form></a></li>
 		              </ul>
@@ -189,7 +189,7 @@ and related projects, please see: http://www.isi.edu/integration
 		            <li id="manualModeHeader" style="display:none;"><a href="#" style="cursor: none">Manual Mode</a></li>
 		          </ul>
 		          <ul class="nav navbar-nav navbar-right">
-		          <li>Yelp Hackathon-19</li>
+		          <li style="color: #ffffff">Yelp Hackathon-19</li>
 		          <li></li>
 		          </ul>
 		        </div>
