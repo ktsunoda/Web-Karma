@@ -40,7 +40,7 @@ public class RamblerTransformation implements Transformation {
 			return value;
 		else
 			return s;
-	}	
+	}
 	public String getId() {
 		// TODO Auto-generated method stub
 		return this.signature;
@@ -57,6 +57,9 @@ public class RamblerTransformation implements Transformation {
 			return true;
 		}
 		return false;
+	}
+	public String getPrograminString(){
+		return this.prog.toString();
 	}
 	public String getClassLabel(String value)
 	{

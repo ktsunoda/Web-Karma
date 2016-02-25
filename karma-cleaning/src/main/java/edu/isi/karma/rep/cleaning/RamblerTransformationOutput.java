@@ -91,6 +91,7 @@ public class RamblerTransformationOutput implements TransformationOutput {
 		Iterator<ProgramRule> iterator = rules.iterator();
 		while (iterator.hasNext()) {
 			RamblerTransformation r = new RamblerTransformation(iterator.next());
+			logger.info("Scripts: "+r.getPrograminString());
 			if (!transformations.containsKey(r.signature)) {
 				transformations.put(r.signature, r);
 			}
