@@ -17,11 +17,6 @@
         
 	<repositories>
 		<repository>
-		    <id>colo-vm41</id>
-		    <name>colo-vm41</name>
-		    <url>http://colo-vm41.isi.edu:8081/artifactory/simple/libs-release-local/</url>
-		</repository>
-		<repository>
       		<id>cloudera</id>
       		<url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
     	</repository>
